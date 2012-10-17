@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
+#include <fcntl.h>
+#include <sys/types.h>
+//#include <sys/uio.h>
+#include <unistd.h>
+
 #include <libusb-1.0/libusb.h>
 
 #define DEBUG 1
@@ -33,6 +39,7 @@ static const char str_Interrogation[] = "?";
 static const char str_X[] = "X";
 static const char str_x[] = "x";
 static const char str_vFlashErase[] = "vFlashErase";
+static const char str_vFlashWrite[] = "vFlashWrite";
 
 static const uint8_t INTERFACE_NR = 0x02;
 static const uint8_t ENDPOINT_IN  = 0x83;
@@ -41,7 +48,8 @@ static const uint8_t ENDPOINT_OUT = 0x02;
 static const char START_CHAR = '$';
 static const char END_CHAR   = '#';
 
-static uint8_t buffer[512];
+static uint8_t buffer[1024];
+static uint8_t fdbuffer[512];
 
 static inline char NIBBLE_TO_CHAR(uint8_t nibble)
 {
@@ -52,13 +60,15 @@ static int send_command(libusb_device_handle *handle, int size)
 {
 	int transferred = 0;
 	int retval;
-	int i;
+	int i, col;
 
 #ifdef DEBUG
-	printf("buffer: [");
-	for (i = 0; i < size; i++)
+	printf("buffer:\n");
+	for (i = 0, col = 1; i < size; i++, col++) {
 		printf("%02x ", buffer[i]);
-	printf("]\n");
+		if (col == 16) { col = 0; printf("\n"); }
+	}
+	printf("\n");
 #endif
 
 	retval = libusb_bulk_transfer(handle, ENDPOINT_OUT, buffer, size, &transferred, 0);
@@ -334,10 +344,75 @@ static int send_vFlashErase(libusb_device_handle *handle, uint32_t start, uint32
 	return retval;
 }
 
-static int init(libusb_device_handle *handle)
+static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, int fd, int size)
+{
+	int retval;
+	size_t idx;
+	uint8_t sum;
+	int i;
+	int transferred = 0;
+	size_t rdsize;
+
+	idx = 0;
+	buffer[idx++] = '$';
+	memcpy(&buffer[idx], str_vFlashWrite, strlen(str_vFlashWrite));
+	idx += strlen(str_vFlashWrite);
+
+	buffer[idx++] = ':';
+
+	for (i = 28; i >= 0; i -= 4)
+		buffer[idx++] = NIBBLE_TO_CHAR((addr >> i) & 0x0F);
+
+	buffer[idx++] = ':';
+
+	// FIXME: need to check return and size cant be more than 512
+	rdsize = read(fd, fdbuffer, size);
+
+	for (i = 0; i < size; i++) {
+		uint8_t by = fdbuffer[i];
+		// Escape chars
+		if (by == '#' || by == '$' || by == '}') {
+			buffer[idx++] = '}';
+			buffer[idx++] = by ^ 0x20;
+		} else {
+			buffer[idx++] = by;
+		}
+	}
+
+	buffer[idx] = '#';
+
+	for (i = 1, sum = 0; i < idx; i++)
+		sum += buffer[i];
+
+	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
+	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
+	idx++;
+
+#ifdef DEBUG
+	printf("%s\n", __func__);
+#endif
+
+	retval = send_command(handle, idx);
+	// wait for ack (+/-)
+	retval = wait_response(handle, &transferred);
+	// wait for command response
+	retval = wait_response(handle, &transferred);
+
+	//return retval;
+	return rdsize;
+}
+
+
+/*
+ *  This flow is of commands is based on an USB capture of
+ *  traffic between LM Flash Programmer and the Stellaris Launchpad
+ *  when doing a firmware write
+ */
+static int write_firmware(libusb_device_handle *handle, int fd)
 {
 	int retval;
 	uint32_t val = 0;
+	uint32_t addr;
 
 	retval = send_qRcmd(handle, cmd_str1, sizeof(cmd_str1) - 1);
 	retval = send_qSupported(handle);
@@ -358,10 +433,32 @@ static int init(libusb_device_handle *handle)
 	retval = send_x(handle, XXX1CTL + 8, 4, &val);
 	retval = send_x(handle, XXX1CTL, 4, &val);
 	retval = send_x(handle, XXX4CTL, 4, &val);
+
+	/* XXX: Repeated below, why? */
 	retval = send_X(handle, FMA, 4, 0x00000000);
 	retval = send_x(handle, XXX2CTL, 4, &val);
 	retval = send_vFlashErase(handle, 0, 0);
 	retval = send_qRcmd(handle, cmd_str3, sizeof(cmd_str3) - 1);
+	retval = send_x(handle, XXX2CTL, 4, &val);
+
+	retval = send_X(handle, XXX2CTL, 4, 0x00000000);
+
+	/* XXX: this is the same sequence of the above commands? */
+	retval = send_X(handle, FMA, 4, 0x00000200);
+	retval = send_x(handle, XXX2CTL, 4, &val);
+	retval = send_vFlashErase(handle, 0, 0);
+	retval = send_qRcmd(handle, cmd_str3, sizeof(cmd_str3) - 1);
+	retval = send_x(handle, XXX2CTL, 4, &val);
+
+	retval = send_x(handle, ROMCTL, 4, &val);
+	retval = send_X(handle, ROMCTL, 4, 0x00000000);
+	retval = send_x(handle, XXX2CTL, 4, &val);
+
+	for (addr = 0, retval = 512; retval == 512; addr += 0x200)
+		retval = send_vFlashWrite(handle, addr, fd, 512);
+
+	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
+	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
 }
 
 int main(int argc, char *argv[])
@@ -370,6 +467,12 @@ int main(int argc, char *argv[])
 	libusb_device *dev;
 	libusb_device_handle *handle;
 	int retval;
+	int fd;
+
+	if (argc < 2) {
+		printf("usage: %s <binary-file>\n", argv[0]);
+		exit(1);
+	}
 
 	if (libusb_init(&ctx) != 0) {
 		fprintf(stderr, "Error initializing libusb\n");
@@ -393,8 +496,16 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	retval = init(handle);
+	fd = open(argv[1], O_RDONLY);
+	if (fd == -1) {
+		libusb_close(handle);
+		libusb_exit(ctx);
+		exit(1);
+	}
 
+	retval = write_firmware(handle, fd);
+
+	close(fd);
 	libusb_close(handle);
 	libusb_exit(ctx);
 	return 0;
