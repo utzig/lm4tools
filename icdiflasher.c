@@ -362,7 +362,7 @@ static int send_vFlashErase(libusb_device_handle *handle, uint32_t start, uint32
 	return retval;
 }
 
-static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, int fd, int size)
+static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, FILE *f, int size)
 {
 	int retval;
 	size_t idx;
@@ -384,7 +384,7 @@ static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, int fd,
 	buffer[idx++] = ':';
 
 	// FIXME: need to check return and size cant be more than 512
-	rdsize = read(fd, fdbuffer, size);
+	rdsize = fread(fdbuffer, 1, size, f);
 
 	for (i = 0; i < size; i++) {
 		uint8_t by = fdbuffer[i];
@@ -426,7 +426,7 @@ static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, int fd,
  *  traffic between LM Flash Programmer and the Stellaris Launchpad
  *  when doing a firmware write
  */
-static int write_firmware(libusb_device_handle *handle, int fd)
+static int write_firmware(libusb_device_handle *handle, FILE *f)
 {
 	int retval;
 	uint32_t val = 0;
@@ -473,7 +473,7 @@ static int write_firmware(libusb_device_handle *handle, int fd)
 	retval = send_x(handle, XXX2CTL, 4, &val);
 
 	for (addr = 0, retval = 512; retval == 512; addr += 0x200)
-		retval = send_vFlashWrite(handle, addr, fd, 512);
+		retval = send_vFlashWrite(handle, addr, f, 512);
 
 	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
 	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
@@ -491,7 +491,7 @@ int main(int argc, char *argv[])
 	libusb_device *dev = NULL;
 	libusb_device_handle *handle = NULL;
 	int retval = 1;
-	int fd = -1;
+	FILE *f = NULL;
 
 	if (argc < 2) {
 		printf("usage: %s <binary-file>\n", argv[0]);
@@ -519,18 +519,18 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	fd = open(argv[1], O_RDONLY);
-	if (fd == -1) {
-		perror("open");
+	f = fopen(argv[1], "rb");
+	if (!f) {
+		perror("fopen");
 		retval = 1;
 		goto done;
 	}
 
-	retval = write_firmware(handle, fd);
+	retval = write_firmware(handle, f);
 
 done:
-	if (fd != -1)
-		close(fd);
+	if (f)
+		fclose(f);
 	if (handle)
 		libusb_close(handle);
 	if (ctx)
