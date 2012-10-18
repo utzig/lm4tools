@@ -25,7 +25,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 
 //#define DEBUG 1
 
@@ -49,6 +49,7 @@ static const char cmd_str2[] = "debug sreset";
 static const char cmd_str3[] = "debug creset";
 static const char cmd_str4[] = "set vectorcatch 0";
 static const char cmd_str5[] = "debug disable";
+static const char cmd_str6[] = "debug hreset";
 
 static const char str_qRcmd[] = "qRcmd,";
 static const char str_qSupported[] = "qSupported";
@@ -474,6 +475,12 @@ static int write_firmware(libusb_device_handle *handle, int fd)
 	for (addr = 0, retval = 512; retval == 512; addr += 0x200)
 		retval = send_vFlashWrite(handle, addr, fd, 512);
 
+	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
+	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
+
+	// reset board
+	retval = send_X(handle, FPB, 4, 0x03000000);
+	retval = send_qRcmd(handle, cmd_str6, sizeof(cmd_str6) - 1);
 	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
 	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
 }
