@@ -78,9 +78,10 @@ static int send_command(libusb_device_handle *handle, int size)
 {
 	int transferred = 0;
 	int retval;
-	int i, col;
 
 #ifdef DEBUG
+	int i, col;
+
 	printf("buffer:\n");
 	for (i = 0, col = 1; i < size; i++, col++) {
 		printf("%02x ", buffer[i]);
@@ -100,7 +101,9 @@ static int send_command(libusb_device_handle *handle, int size)
 static int wait_response(libusb_device_handle *handle, int *size)
 {
 	int retval;
+#ifdef DEBUG
 	int i;
+#endif
 
 	retval = libusb_bulk_transfer(handle, ENDPOINT_IN, buffer, sizeof(buffer), size, 0);
 	if (retval != 0) {
@@ -488,7 +491,6 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 int main(int argc, char *argv[])
 {
 	libusb_context *ctx = NULL;
-	libusb_device *dev = NULL;
 	libusb_device_handle *handle = NULL;
 	int retval = 1;
 	FILE *f = NULL;
