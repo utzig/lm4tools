@@ -44,35 +44,49 @@ static const uint32_t ROMCTL  = 0x400fe0f0;
 // Flash Memory Address: see Stellaris LM4F120H5QR Microcontroller Page 497
 static const uint32_t FMA     = 0x400fd000;
 
-static const char cmd_str1[] = "debug clock \0";
-static const char cmd_str2[] = "debug sreset";
-static const char cmd_str3[] = "debug creset";
-static const char cmd_str4[] = "set vectorcatch 0";
-static const char cmd_str5[] = "debug disable";
-static const char cmd_str6[] = "debug hreset";
-
-static const char str_qRcmd[] = "qRcmd,";
-static const char str_qSupported[] = "qSupported";
-static const char str_Interrogation[] = "?";
-static const char str_X[] = "X";
-static const char str_x[] = "x";
-static const char str_vFlashErase[] = "vFlashErase";
-static const char str_vFlashWrite[] = "vFlashWrite";
-
 static const uint8_t INTERFACE_NR = 0x02;
 static const uint8_t ENDPOINT_IN  = 0x83;
 static const uint8_t ENDPOINT_OUT = 0x02;
 
-static const char START_CHAR = '$';
-static const char END_CHAR   = '#';
+#define START "$"
+#define END "#"
 
-static uint8_t buffer[1024];
-static uint8_t fdbuffer[512];
+#ifdef WIN32
+#define snprintf _snprintf
+#define SNPRINTF_OFFSET 1
+#else
+#define SNPRINTF_OFFSET 0
+#endif
 
-static inline char NIBBLE_TO_CHAR(uint8_t nibble)
+#define START_LEN strlen(START)
+#define END_LEN (strlen(END) + 2)
+
+#define FLASH_BLOCK_SIZE 512
+
+/* Prefix + potentially every flash byte escaped */
+#define BUF_SIZE 64 + 2*FLASH_BLOCK_SIZE
+
+static uint8_t flash_block[FLASH_BLOCK_SIZE];
+static union {
+	char c[BUF_SIZE];
+	uint8_t u8[BUF_SIZE];
+	uint32_t u32[BUF_SIZE / 4];
+} buf;
+
+static uint32_t le32_to_cpu(const uint32_t x)
 {
-	return nibble < 10 ? nibble + '0' : nibble - 10 + 'a';
+	union {
+		uint8_t  b8[4];
+		uint32_t b32;
+	} _tmp;
+	_tmp.b8[3] = x >> 24;
+	_tmp.b8[2] = x >> 16;
+	_tmp.b8[1] = x >> 8;
+	_tmp.b8[0] = x & 0xff;
+	return _tmp.b32;
 }
+
+#define cpu_to_le32 le32_to_cpu
 
 static int send_command(libusb_device_handle *handle, int size)
 {
@@ -84,13 +98,13 @@ static int send_command(libusb_device_handle *handle, int size)
 
 	printf("buffer:\n");
 	for (i = 0, col = 1; i < size; i++, col++) {
-		printf("%02x ", buffer[i]);
+		printf("%02x ", buf.u8[i]);
 		if (col == 16) { col = 0; printf("\n"); }
 	}
 	printf("\n");
 #endif
 
-	retval = libusb_bulk_transfer(handle, ENDPOINT_OUT, buffer, size, &transferred, 0);
+	retval = libusb_bulk_transfer(handle, ENDPOINT_OUT, buf.u8, size, &transferred, 0);
 	if (retval != 0 || size != transferred) {
 		printf("Error transmitting data %d\n", retval);
 	}
@@ -105,7 +119,7 @@ static int wait_response(libusb_device_handle *handle, int *size)
 	int i;
 #endif
 
-	retval = libusb_bulk_transfer(handle, ENDPOINT_IN, buffer, sizeof(buffer), size, 0);
+	retval = libusb_bulk_transfer(handle, ENDPOINT_IN, buf.u8, BUF_SIZE, size, 0);
 	if (retval != 0) {
 		printf("Error receiving data %d\n", retval);
 	}
@@ -114,314 +128,189 @@ static int wait_response(libusb_device_handle *handle, int *size)
 	printf("wait_response: size=%d\n", *size);
 	printf("buffer: ");
 	for (i = 0; i < *size; i++)
-		printf("0x%02x ", buffer[i]);
+		printf("0x%02x ", buf.u8[i]);
 	printf("\n");
 #endif
 
 	return retval;
 }
 
-static int send_qRcmd(libusb_device_handle *handle, const char *cmd, size_t size)
+static int checksum_and_send(libusb_device_handle *handle, size_t idx)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
+	size_t i;
+	uint8_t sum = 0;
+	int retval, transfered;
 
-	idx = 0;
-	buffer[idx++] = '$';
-	memcpy(&buffer[idx], str_qRcmd, strlen(str_qRcmd));
-	idx += strlen(str_qRcmd);
+	if (idx + SNPRINTF_OFFSET + END_LEN > BUF_SIZE)
+		return LIBUSB_ERROR_NO_MEM;
 
-	for (i = 0; i < size; i++) {
-		buffer[idx++] = NIBBLE_TO_CHAR(cmd[i] >> 4);
-		buffer[idx++] = NIBBLE_TO_CHAR(cmd[i] & 0x0F);
-	}
+	for (i = 1; i < idx; i++)
+		sum += buf.u8[i];
 
-	buffer[idx] = '#';
-
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
-
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
+	idx += sprintf(buf.c + idx, END "%02x", sum);
 
 	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
+	if (retval)
+		return retval;
+
+	/* wait for ack (+/-) */
+	retval = wait_response(handle, &transfered);
+	if (retval)
+		return retval;
+
+	/* FIXME: validate transfered here? */
+
+	/* wait for command response */
+	retval = wait_response(handle, &transfered);
+
+	/* FIXME: validate transfered here? */
 
 	return retval;
 }
 
-static int send_qSupported(libusb_device_handle *handle)
+
+static int send_u8_hex(libusb_device_handle *handle, const char *prefix, const char *bytes, size_t num_bytes)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
+	size_t i, idx;
 
-	idx = 0;
-	buffer[idx++] = '$';
-	memcpy(&buffer[idx], str_qSupported, strlen(str_qSupported));
-	idx += strlen(str_qSupported);
+	/* Make sure that everything fits!
+	 * START + prefix + hex bytes + END + hex checksum + '\0'
+	 */
+	if (START_LEN + (prefix ? strlen(prefix) : 0) + (2 * num_bytes) + END_LEN + 1 > BUF_SIZE)
+		return LIBUSB_ERROR_NO_MEM;
 
-	buffer[idx] = '#';
+	idx = sprintf(buf.c, START "%s", prefix);
 
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
+	for (i = 0; bytes && i < num_bytes; i++)
+		idx += sprintf(buf.c + idx, "%02x", bytes[i]);
 
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	return retval;
+	return checksum_and_send(handle, idx);
 }
 
-static int send_Interrogation(libusb_device_handle *handle)
+static int send_u8_binary(libusb_device_handle *handle, const char *prefix, const char *bytes, size_t num_bytes)
 {
-	int retval;
 	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
 
-	idx = 0;
-	buffer[idx++] = '$';
-	memcpy(&buffer[idx], str_Interrogation, strlen(str_Interrogation));
-	idx += strlen(str_Interrogation);
+	/* Make sure that everything fits!
+	 * START + prefix + bytes + END + hex checksum + '\0'
+	 */
+	if (START_LEN + (prefix ? strlen(prefix) : 0) + num_bytes + END_LEN + 1 > BUF_SIZE)
+		return LIBUSB_ERROR_NO_MEM;
 
-	buffer[idx] = '#';
+	idx = sprintf(buf.c, START "%s", prefix);
 
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
+	memcpy(buf.c + idx, bytes, num_bytes);
+	idx += num_bytes;
 
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	return retval;
+	return checksum_and_send(handle, idx);
 }
 
-static int send_X(libusb_device_handle *handle, uint32_t addr, int size, uint32_t val)
+static int send_u32(libusb_device_handle *handle, const char *prefix, const uint32_t val, const char *suffix)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
+	size_t idx = snprintf(buf.c, BUF_SIZE, START "%s%08x%s",
+			prefix ? prefix : "", val,
+			suffix ? suffix : "");
 
-	idx = 0;
-	buffer[idx++] = START_CHAR;
-	memcpy(&buffer[idx], str_X, strlen(str_X));
-	idx += strlen(str_X);
-
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((addr >> i) & 0x0F);
-
-	// FIXME: should use size but here it's always uint32_t
-	buffer[idx++] = ',';
-	buffer[idx++] = '4';
-	buffer[idx++] = ':';
-
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((val >> i) & 0x0F);
-
-	buffer[idx] = '#';
-
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
-
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	return retval;
+	return checksum_and_send(handle, idx);
 }
 
-static int send_x(libusb_device_handle *handle, uint32_t addr, int size, uint32_t *val)
+static int send_u32_u32(libusb_device_handle *handle, const char *prefix, const uint32_t val1, const char *infix, const uint32_t val2, const char *suffix)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
+	size_t idx = snprintf(buf.c, BUF_SIZE, START "%s%08x%s%08x%s",
+			prefix ? prefix : "", val1,
+			infix ? infix : "", val2,
+			suffix ? suffix : "");
 
-	idx = 0;
-	buffer[idx++] = START_CHAR;
-	memcpy(&buffer[idx], str_x, strlen(str_x));
-	idx += strlen(str_x);
-
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((addr >> i) & 0x0F);
-
-	// FIXME: should use size but here it's always uint32_t
-	buffer[idx++] = ',';
-	buffer[idx++] = '4';
-
-	buffer[idx] = '#';
-
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
-
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	return retval;
+	return checksum_and_send(handle, idx);
 }
 
-static int send_vFlashErase(libusb_device_handle *handle, uint32_t start, uint32_t end)
+
+static int send_mem_write(libusb_device_handle *handle, const uint32_t addr, const uint32_t val)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
-
-	idx = 0;
-	buffer[idx++] = START_CHAR;
-	memcpy(&buffer[idx], str_vFlashErase, strlen(str_vFlashErase));
-	idx += strlen(str_vFlashErase);
-
-	buffer[idx++] = ':';
-
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((start >> i) & 0x0F);
-
-	// FIXME: should use size but here it's always uint32_t
-	buffer[idx++] = ',';
-
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((end >> i) & 0x0F);
-
-	buffer[idx] = '#';
-
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
-
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	return retval;
+	return send_u32_u32(handle, "X", addr, ",4:", val, NULL);
 }
 
-static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, FILE *f, int size)
+static int send_mem_read(libusb_device_handle *handle, const uint32_t addr, uint32_t *val)
 {
-	int retval;
-	size_t idx;
-	uint8_t sum;
-	int i;
-	int transferred = 0;
-	size_t rdsize;
+	int retval = send_u32(handle, "x", addr, ",4");
+	if (retval)
+		return retval;
 
-	idx = 0;
-	buffer[idx++] = '$';
-	memcpy(&buffer[idx], str_vFlashWrite, strlen(str_vFlashWrite));
-	idx += strlen(str_vFlashWrite);
+	if (val)
+		*val = le32_to_cpu(buf.u32[0]);
 
-	buffer[idx++] = ':';
+	return 0;
+}
 
-	for (i = 28; i >= 0; i -= 4)
-		buffer[idx++] = NIBBLE_TO_CHAR((addr >> i) & 0x0F);
+static int send_flash_erase(libusb_device_handle *handle, const uint32_t start, const uint32_t end)
+{
+	return send_u32_u32(handle, "vFlashErase:", start, ",", end, NULL);
+}
 
-	buffer[idx++] = ':';
+static int send_flash_write(libusb_device_handle *handle, const uint32_t addr, const uint8_t *bytes, size_t len)
+{
+	size_t i;
+	char prefix[] = "vFlashWrite:12345678:";
+	char by, rawbuf[1024], *buf = rawbuf;
 
-	// FIXME: need to check return and size cant be more than 512
-	rdsize = fread(fdbuffer, 1, size, f);
+	sprintf(strchr(prefix, ':') + 1, "%08x:", addr);
 
-	for (i = 0; i < size; i++) {
-		uint8_t by = fdbuffer[i];
-		// Escape chars
-		if (by == '#' || by == '$' || by == '}') {
-			buffer[idx++] = '}';
-			buffer[idx++] = by ^ 0x20;
-		} else {
-			buffer[idx++] = by;
+	for (i = 0; i < len; i++)
+		switch (by = bytes[i]) {
+		case '#':
+		case '$':
+		case '}':
+			*buf++ = '}';
+			by ^= 0x20;
+			/* fall through */
+		default:
+			if (buf >= rawbuf + sizeof(rawbuf))
+				return LIBUSB_ERROR_NO_MEM;
+
+			*buf++ = by;
+			break;
 		}
-	}
 
-	buffer[idx] = '#';
+	i = buf - rawbuf;
 
-	for (i = 1, sum = 0; i < idx; i++)
-		sum += buffer[i];
-
-	buffer[++idx] = NIBBLE_TO_CHAR(sum >> 4);
-	buffer[++idx] = NIBBLE_TO_CHAR(sum & 0x0F);
-	idx++;
-
-#ifdef DEBUG
-	printf("%s\n", __func__);
-#endif
-
-	retval = send_command(handle, idx);
-	// wait for ack (+/-)
-	retval = wait_response(handle, &transferred);
-	// wait for command response
-	retval = wait_response(handle, &transferred);
-
-	//return retval;
-	return rdsize;
+	return send_u8_binary(handle, prefix, rawbuf, i) ? -1 : i;
 }
+
+#define SEND_COMMAND(cmd) do { \
+	int r = send_u8_hex(handle, "qRcmd,", (cmd), sizeof((cmd)) - 1); \
+	if (r) \
+		return r; \
+} while (0)
+
+#define SEND_STRING(str) do { \
+	int r = send_u8_hex(handle, (str), NULL, 0); \
+	if (r) \
+		return r; \
+} while (0)
+
+#define MEM_WRITE(address, value) do { \
+	int r = send_mem_write(handle, (address), (value)); \
+	if (r) \
+		return r; \
+} while (0)
+
+#define MEM_READ(address, value) do { \
+	int r = send_mem_read(handle, (address), (value)); \
+	if (r) \
+		return r; \
+} while (0)
+
+#define FLASH_ERASE(start, end) do { \
+	int r = send_flash_erase(handle, (start), (end)); \
+	if (r) \
+		return r; \
+} while (0)
+
+#define FLASH_WRITE(address, data, length) do { \
+	int r = send_flash_write(handle, (address), (data), (length)); \
+	if (r < (length)) \
+		return LIBUSB_ERROR_OTHER; \
+} while (0)
 
 
 /*
@@ -431,61 +320,71 @@ static int send_vFlashWrite(libusb_device_handle *handle, uint32_t addr, FILE *f
  */
 static int write_firmware(libusb_device_handle *handle, FILE *f)
 {
-	int retval;
 	uint32_t val = 0;
 	uint32_t addr;
+	size_t rdbytes;
 
-	retval = send_qRcmd(handle, cmd_str1, sizeof(cmd_str1) - 1);
-	retval = send_qSupported(handle);
-	retval = send_Interrogation(handle);
-	retval = send_X(handle, FPB, 4, 0x03000000);
-	retval = send_x(handle, XXX1CTL, 4, &val);
-	retval = send_x(handle, XXX1CTL + 4, 4, &val);
-	retval = send_Interrogation(handle);
-	retval = send_x(handle, XXX2CTL, 4, &val);
-	retval = send_qRcmd(handle, cmd_str2, sizeof(cmd_str2) - 1);
-	retval = send_x(handle, XXX2CTL, 4, &val);
-	retval = send_x(handle, ROMCTL, 4, &val);
-	retval = send_X(handle, ROMCTL, 4, 0x00000000);
-	retval = send_x(handle, XXX2CTL, 4, &val);
-	retval = send_x(handle, XXX3CTL, 4, &val);
-	retval = send_x(handle, XXX1CTL, 4, &val);
-	retval = send_x(handle, XXX1CTL + 4, 4, &val);
-	retval = send_x(handle, XXX1CTL + 8, 4, &val);
-	retval = send_x(handle, XXX1CTL, 4, &val);
-	retval = send_x(handle, XXX4CTL, 4, &val);
+	SEND_COMMAND("debug clock \0");
+	SEND_STRING("qSupported");
+	SEND_STRING("?");
+	MEM_WRITE(FPB, 0x3000000);
+	MEM_READ(XXX1CTL, &val);
+	MEM_READ(XXX1CTL + 4, &val);
+	SEND_STRING("?");
+	MEM_READ(XXX2CTL, &val);
+	SEND_COMMAND("debug sreset");
+	MEM_READ(XXX2CTL, &val);
+	MEM_READ(ROMCTL, &val);
+	MEM_WRITE(ROMCTL, 0x0);
+	MEM_READ(XXX2CTL, &val);
+	MEM_READ(XXX3CTL, &val);
+	MEM_READ(XXX1CTL, &val);
+	MEM_READ(XXX1CTL + 4, &val);
+	MEM_READ(XXX1CTL + 8, &val);
+	MEM_READ(XXX1CTL, &val);
+	MEM_READ(XXX4CTL, &val);
 
 	/* XXX: Repeated below, why? */
-	retval = send_X(handle, FMA, 4, 0x00000000);
-	retval = send_x(handle, XXX2CTL, 4, &val);
-	retval = send_vFlashErase(handle, 0, 0);
-	retval = send_qRcmd(handle, cmd_str3, sizeof(cmd_str3) - 1);
-	retval = send_x(handle, XXX2CTL, 4, &val);
+	MEM_WRITE(FMA, 0x0);
+	MEM_READ(XXX2CTL, &val);
+	FLASH_ERASE(0, 0);
+	SEND_COMMAND("debug creset");
+	MEM_READ(XXX2CTL, &val);
 
-	retval = send_X(handle, XXX2CTL, 4, 0x00000000);
+	MEM_WRITE(XXX2CTL, 0x0);
 
 	/* XXX: this is the same sequence of the above commands? */
-	retval = send_X(handle, FMA, 4, 0x00000200);
-	retval = send_x(handle, XXX2CTL, 4, &val);
-	retval = send_vFlashErase(handle, 0, 0);
-	retval = send_qRcmd(handle, cmd_str3, sizeof(cmd_str3) - 1);
-	retval = send_x(handle, XXX2CTL, 4, &val);
+	MEM_WRITE(FMA, 0x200);
+	MEM_READ(XXX2CTL, &val);
+	FLASH_ERASE(0, 0);
+	SEND_COMMAND("debug creset");
+	MEM_READ(XXX2CTL, &val);
 
-	retval = send_x(handle, ROMCTL, 4, &val);
-	retval = send_X(handle, ROMCTL, 4, 0x00000000);
-	retval = send_x(handle, XXX2CTL, 4, &val);
+	MEM_READ(ROMCTL, &val);
+	MEM_WRITE(ROMCTL, 0x0);
+	MEM_READ(XXX2CTL, &val);
 
-	for (addr = 0, retval = 512; retval == 512; addr += 0x200)
-		retval = send_vFlashWrite(handle, addr, f, 512);
+	for (addr = 0; !feof(f); addr += sizeof(flash_block)) {
+		rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
 
-	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
-	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
+		if (rdbytes < sizeof(flash_block) && !feof(f)) {
+			perror("fread");
+			return LIBUSB_ERROR_OTHER;
+		}
 
-	// reset board
-	retval = send_X(handle, FPB, 4, 0x03000000);
-	retval = send_qRcmd(handle, cmd_str6, sizeof(cmd_str6) - 1);
-	retval = send_qRcmd(handle, cmd_str4, sizeof(cmd_str4) - 1);
-	retval = send_qRcmd(handle, cmd_str5, sizeof(cmd_str5) - 1);
+		FLASH_WRITE(addr, flash_block, rdbytes);
+	}
+
+	SEND_COMMAND("set vectorcatch 0");
+	SEND_COMMAND("debug disable");
+
+	/* reset board */
+	MEM_WRITE(FPB, 0x3000000);
+	SEND_COMMAND("debug hreset");
+	SEND_COMMAND("set vectorcatch 0");
+	SEND_COMMAND("debug disable");
+
+	return 0;
 }
 
 int main(int argc, char *argv[])
