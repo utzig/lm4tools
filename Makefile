@@ -1,7 +1,7 @@
 EXE := icdiflasher
 
-CFLAGS := -g -O2
-LDFLAGS := -lusb-1.0
+CFLAGS := -g -O2 $(shell pkg-config --cflags libusb-1.0)
+LDFLAGS := $(shell pkg-config --libs libusb-1.0)
 
 all: $(EXE)
 
