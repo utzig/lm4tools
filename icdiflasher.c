@@ -487,20 +487,20 @@ static int write_firmware(libusb_device_handle *handle, int fd)
 
 int main(int argc, char *argv[])
 {
-	libusb_context *ctx;
-	libusb_device *dev;
-	libusb_device_handle *handle;
-	int retval;
-	int fd;
+	libusb_context *ctx = NULL;
+	libusb_device *dev = NULL;
+	libusb_device_handle *handle = NULL;
+	int retval = 1;
+	int fd = -1;
 
 	if (argc < 2) {
 		printf("usage: %s <binary-file>\n", argv[0]);
-		exit(1);
+		goto done;
 	}
 
 	if (libusb_init(&ctx) != 0) {
 		fprintf(stderr, "Error initializing libusb\n");
-		exit(1);
+		goto done;
 	}
 
 	// print all error messages
@@ -509,28 +509,32 @@ int main(int argc, char *argv[])
 	/* FIXME: should not be using this function call! */
 	handle = libusb_open_device_with_vid_pid(ctx, 0x1cbe, 0x00fd);
 	if (!handle) {
-		libusb_exit(ctx);
 		printf("Device not found\n");
-		exit(1);
+		goto done;
 	}
 
 	retval = libusb_claim_interface(handle, INTERFACE_NR);
 	if (retval != 0) {
 		printf("Error claiming interface %d\n", retval);
-		exit(1);
+		goto done;
 	}
 
 	fd = open(argv[1], O_RDONLY);
 	if (fd == -1) {
-		libusb_close(handle);
-		libusb_exit(ctx);
-		exit(1);
+		perror("open");
+		retval = 1;
+		goto done;
 	}
 
 	retval = write_firmware(handle, fd);
 
-	close(fd);
-	libusb_close(handle);
-	libusb_exit(ctx);
-	return 0;
+done:
+	if (fd != -1)
+		close(fd);
+	if (handle)
+		libusb_close(handle);
+	if (ctx)
+		libusb_exit(ctx);
+
+	return retval;
 }
