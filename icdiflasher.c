@@ -505,9 +505,6 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	// print all error messages
-	libusb_set_debug(ctx, 0);
-
 	/* FIXME: should not be using this function call! */
 	handle = libusb_open_device_with_vid_pid(ctx, 0x1cbe, 0x00fd);
 	if (!handle) {
