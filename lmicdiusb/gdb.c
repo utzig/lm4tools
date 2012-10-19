@@ -166,7 +166,7 @@ static void gdb_packet_from_usb(GDBCTX *pGdbCtx, int bCsumValid)
 //  operation RX'es anything from the USB devices (ie. the GDB server)
 //
 //****************************************************************************
-void 
+void LIBUSB_CALL
 usb_callback(struct libusb_transfer *pTrans)
 {
     int rc;

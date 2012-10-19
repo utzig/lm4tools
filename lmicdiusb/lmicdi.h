@@ -44,6 +44,18 @@
 #include <unistd.h>
 #include <time.h>
 
+/* LIBUSB_CALL was introduced in libusb-1.0.9, which also fixes many bugs.
+ * It's strongly recommended to not use any older version, but to be more
+ * compatible let's include the LIBUSB_CALL definition here too.
+ */
+#ifndef LIBUSB_CALL
+#if defined(_WIN32) || defined(__CYGWIN__)
+#define LIBUSB_CALL WINAPI
+#else
+#define LIBUSB_CALL
+#endif
+#endif /* LIBUSB_CALL */
+
 //*****************************************************************************
 //
 //   MACROS 
@@ -112,7 +124,7 @@ extern libusb_device_handle *phDev;
 extern int
 SocketIO(int iPort, libusb_device_handle *phDev);
 
-void usb_callback
+void LIBUSB_CALL usb_callback
 (struct libusb_transfer *pTrans);
 
 void
