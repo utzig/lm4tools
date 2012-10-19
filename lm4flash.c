@@ -1,4 +1,4 @@
-/* icdiflasher - TI Stellaris Launchpad compatible ICDI flasher
+/* lm4flash - TI Stellaris Launchpad ICDI flasher
  * Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>
  * Copyright (C) 2012 Peter Stuge <peter@stuge.se>
  *
