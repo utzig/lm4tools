@@ -1,0 +1,74 @@
+// This is the list of commands supported by the in circuit debugger on the 
+// Stellaris LM4F120 LaunchPad.
+
+//Start Rcmd's
+
+*debug
+**mode - do nothing
+**disable - disable DAP
+**speed - argument < 5
+**trace - do nothing
+**unlock - Perform Debug mass erase (factory reset)
+**sreset - System Reset
+**creset - core reset only 
+**hreset - hardware pin reset
+
+*set
+**resettype - do nothing
+**vectorcatch - set or clear vector catch bit in the DAP accepts 1 or 0
+**stepirq - set or clear the step irq bit in the DAP
+**xtal - set xtal value for Sandstorm, Fury and DustDevil, NOP for other classes
+
+*version - get version number of the firmware
+
+*dfu-update - jump to DFU bootloader.
+
+*mfg
+**setu0 - set user 0 register, used for serial #'s and MAC's.
+**setu1 - set user 1 register, used for serial #'s and MAC's.
+**getu0 - get user 0 register, used for serial #'s and MAC's.
+**getu1 - get user 1 register, used for serial #'s and MAC's.
+
+//END Rcmd's
+
+//Start regular commands
+
+*! -> extend mode
+*? -> halt core
+*A -> nothing
+*c -> start the core (continue)
+*C -> start the core (continue)
+*D -> Detach
+*F -> break
+*g -> send complete registers set
+*G -> nothing
+*H -> sends back empty response
+*i -> nothing
+*I -> nothing
+*m -> read memory
+*M -> write memory
+*p -> read register
+*P -> write register
+*q -> same as 'Q'
+*R -> reset and continue
+*s -> read state of DHCS?
+*S -> identical to s
+*t -> nothing
+*T -> nothing
+*x -> read memory binary
+*X -> write memory binary
+*z -> remove breakpoint
+*Z -> Add breakpoint
+
+*v 
+**FlashErase
+**FlashWrite
+**FlashDone
+**Cont? -> send empty respsonse
+
+*Q -> query packets, 
+** supported -> gets info about the target and what it supports?
+** Xfer -> send back the memory map
+** Rcmd -> call GDBInterpretCommand which processes Rcmd's listed above.
+
+
