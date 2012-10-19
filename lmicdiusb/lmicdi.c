@@ -183,7 +183,13 @@ main(int argc, char *argv[])
             break;
         }
     }
-    ASSERT(pDev != NULL);
+
+    if (NULL == pDev)
+    {
+        fprintf(stderr, "No ICDI device with USB VID:PID %04x:%04x found!\n",
+                LMICDI_VID, LMICDI_PID);
+        return EXIT_FAILURE;
+    }
 
     rc = libusb_open(pDev, &phDev);
     if (rc != 0)
