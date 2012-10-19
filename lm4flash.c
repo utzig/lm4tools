@@ -158,7 +158,8 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx)
 	if (retval)
 		return retval;
 
-	/* FIXME: validate transfered here? */
+	if (transfered != 1 || buf.c[0] != '+')
+		return LIBUSB_ERROR_OTHER;
 
 	/* wait for command response */
 	retval = wait_response(handle, &transfered);
