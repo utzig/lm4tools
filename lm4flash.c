@@ -1,5 +1,6 @@
 /* icdiflasher - TI Stellaris Launchpad compatible ICDI flasher
  * Copyright (C) 2012 Fabio Utzig
+ * Copyright (C) 2012 Peter Stuge <peter@stuge.se>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
