@@ -334,16 +334,8 @@ found:
     //
     // Set up a pending receive...
     //
-    pTrans->dev_handle = phDev;
-    pTrans->flags = 0;              // no auto-freeing of transfers
-    pTrans->endpoint = pdEndpIn->bEndpointAddress;
-    pTrans->type = LIBUSB_TRANSFER_TYPE_BULK;
-    pTrans->timeout = 0;           // no timeout
-    pTrans->buffer = pResp;
-    pTrans->length = sizeof(pResp);
-    pTrans->callback = usb_callback;
-    pTrans->num_iso_packets = 0;
-    pTrans->user_data = &gdbUsbCtx;
+    libusb_fill_bulk_transfer(pTrans, phDev, pdEndpIn->bEndpointAddress,
+            pResp, sizeof(pResp), usb_callback, &gdbUsbCtx, 0);
 
     //
     // And wait for a RX operation to complete...
