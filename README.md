@@ -1,9 +1,4 @@
-lm4flash
+lm4tools
 ========
 
-An libusb based flasher for the TI Stellaris Launchpad.
-
-usage: lm4flash <binary-file>
-
-projet0.bin is the sample LED blinker project that comes
-with CCS.
+Tools to enable multi-platform development on the TI Stellaris Launchpad boards
