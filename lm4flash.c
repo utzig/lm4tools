@@ -30,6 +30,9 @@
 
 //#define DEBUG 1
 
+#define ICDI_VID 0x1cbe
+#define ICDI_PID 0x00fd
+
 // Flash Patch and Breakpoint: see ARM Debug Interface V5 Architecture Specification
 static const uint32_t FPB     = 0xe0002000;
 
@@ -407,9 +410,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* FIXME: should not be using this function call! */
-	handle = libusb_open_device_with_vid_pid(ctx, 0x1cbe, 0x00fd);
+	handle = libusb_open_device_with_vid_pid(ctx, ICDI_VID, ICDI_PID);
 	if (!handle) {
-		printf("Device not found\n");
+		fprintf(stderr, "No ICDI device with USB VID:PID %04x:%04x found!\n",
+				ICDI_VID, ICDI_PID);
 		goto done;
 	}
 
