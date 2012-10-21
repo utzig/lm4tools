@@ -6,7 +6,7 @@ LDFLAGS := $(shell pkg-config --libs libusb-1.0)
 all: $(EXE)
 
 $(EXE): $(EXE).c
-	gcc $(CFLAGS) $(LDFLAGS) -o $@ $^
+	gcc $^ $(CFLAGS) $(LDFLAGS) -o $@
 
 clean:
 	rm -f *.o $(EXE)
