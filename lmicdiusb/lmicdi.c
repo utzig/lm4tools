@@ -43,7 +43,10 @@
 
 struct libusb_context *pCtx;
 
-unsigned int gTraceLvl = 2;
+#ifndef TRACE_LEVEL
+#define TRACE_LEVEL 2
+#endif
+unsigned int gTraceLvl = TRACE_LEVEL;
 
 const struct libusb_endpoint_descriptor *pdEndpIn, *pdEndpOut;
 libusb_device_handle *phDev;
