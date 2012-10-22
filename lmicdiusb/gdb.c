@@ -109,6 +109,15 @@ gdb_statemachine(GDBCTX *pGdbCtx, unsigned char *pBuf, unsigned int len,
                     pGdbCtx->iNakCount++;
                }
                pGdbCtx->pResp[pGdbCtx->iRd++] = *pBuf;
+               if (*pBuf == 0x03)
+               {
+                   /* GDB Ctrl-C */
+                   if (pFn)
+                   {
+                       pFn(pGdbCtx, 1);
+                       pGdbCtx->iRd = 0;
+                   }
+               }
                pBuf++;
                break;
             case GDB_PAYLOAD:
