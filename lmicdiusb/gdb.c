@@ -200,5 +200,6 @@ usb_callback(struct libusb_transfer *pTrans)
 
         default:
             TRACE(ALWAYS, "%s: status = 0x%08x\n", __FUNCTION__, pTrans->status);
+            break;
     }
 }
