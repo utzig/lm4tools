@@ -43,6 +43,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <time.h>
+#include <ctype.h>
 
 /* LIBUSB_CALL was introduced in libusb-1.0.9, which also fixes many bugs.
  * It's strongly recommended to not use any older version, but to be more

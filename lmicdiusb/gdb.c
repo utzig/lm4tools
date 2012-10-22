@@ -112,7 +112,7 @@ gdb_statemachine(GDBCTX *pGdbCtx, unsigned char *pBuf, unsigned int len,
                pBuf++;
                break;
             case GDB_PAYLOAD:
-               TRACE(0, "GDB_PAYLOAD: '%c'\n", *pBuf);
+               TRACE(0, "GDB_PAYLOAD: '%c' 0x%02x\n", isprint(*pBuf) ? *pBuf : '.', *pBuf);
                    pGdbCtx->pResp[pGdbCtx->iRd++] = *pBuf;
                if (*pBuf == '#')
                {
