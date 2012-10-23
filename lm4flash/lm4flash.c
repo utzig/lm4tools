@@ -90,6 +90,8 @@ static uint32_t le32_to_cpu(const uint32_t x)
 	return _tmp.b32;
 }
 
+static int do_verify = 0;
+
 #define cpu_to_le32 le32_to_cpu
 
 static int send_command(libusb_device_handle *handle, int size)
@@ -139,7 +141,7 @@ static int wait_response(libusb_device_handle *handle, int *size)
 	return retval;
 }
 
-static int checksum_and_send(libusb_device_handle *handle, size_t idx)
+static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer)
 {
 	size_t i;
 	uint8_t sum = 0;
@@ -167,6 +169,8 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx)
 
 	/* wait for command response */
 	retval = wait_response(handle, &transfered);
+	if (xfer)
+		*xfer = transfered;
 
 	/* FIXME: validate transfered here? */
 
@@ -189,7 +193,7 @@ static int send_u8_hex(libusb_device_handle *handle, const char *prefix, const c
 	for (i = 0; bytes && i < num_bytes; i++)
 		idx += sprintf(buf.c + idx, "%02x", bytes[i]);
 
-	return checksum_and_send(handle, idx);
+	return checksum_and_send(handle, idx, NULL);
 }
 
 static int send_u8_binary(libusb_device_handle *handle, const char *prefix, const char *bytes, size_t num_bytes)
@@ -207,7 +211,7 @@ static int send_u8_binary(libusb_device_handle *handle, const char *prefix, cons
 	memcpy(buf.c + idx, bytes, num_bytes);
 	idx += num_bytes;
 
-	return checksum_and_send(handle, idx);
+	return checksum_and_send(handle, idx, NULL);
 }
 
 static int send_u32(libusb_device_handle *handle, const char *prefix, const uint32_t val, const char *suffix)
@@ -216,7 +220,7 @@ static int send_u32(libusb_device_handle *handle, const char *prefix, const uint
 			prefix ? prefix : "", val,
 			suffix ? suffix : "");
 
-	return checksum_and_send(handle, idx);
+	return checksum_and_send(handle, idx, NULL);
 }
 
 static int send_u32_u32(libusb_device_handle *handle, const char *prefix, const uint32_t val1, const char *infix, const uint32_t val2, const char *suffix)
@@ -226,7 +230,7 @@ static int send_u32_u32(libusb_device_handle *handle, const char *prefix, const 
 			infix ? infix : "", val2,
 			suffix ? suffix : "");
 
-	return checksum_and_send(handle, idx);
+	return checksum_and_send(handle, idx, NULL);
 }
 
 
@@ -281,6 +285,43 @@ static int send_flash_write(libusb_device_handle *handle, const uint32_t addr, c
 	return send_u8_binary(handle, prefix, rawbuf, i) ? -1 : i;
 }
 
+static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, const uint8_t *bytes, size_t len)
+{
+	size_t i, j;
+	char by, rawbuf[1024], *bp = rawbuf;
+	int retval, transfered;
+
+	size_t idx = snprintf(buf.c, BUF_SIZE, START "x%x,%x", addr, (uint32_t)len);
+
+	retval = checksum_and_send(handle, idx, &transfered);
+
+	for (i = 0; i < transfered; i++) {
+		switch (by = buf.u8[i]) {
+		case '}':
+			by = buf.u8[++i] ^ 0x20;
+			/* fall through */
+		default:
+			if (bp >= rawbuf + sizeof(rawbuf))
+				return LIBUSB_ERROR_NO_MEM;
+
+			*bp++ = by;
+			break;
+		}
+	}
+
+	if (strncmp(rawbuf, "$OK:", 4) != 0)
+		return LIBUSB_ERROR_OTHER;
+
+	for (i = 0, j = strlen("$OK:"); i < len; i++, j++) {
+		if (bytes[i] != (uint8_t)rawbuf[j]) {
+			printf("Error verifying flash\n");
+			return LIBUSB_ERROR_OTHER;
+		}
+	}
+
+	return 0;
+}
+
 #define SEND_COMMAND(cmd) do { \
 	int r = send_u8_hex(handle, "qRcmd,", (cmd), sizeof((cmd)) - 1); \
 	if (r) \
@@ -316,7 +357,6 @@ static int send_flash_write(libusb_device_handle *handle, const uint32_t addr, c
 	if (r < (length)) \
 		return LIBUSB_ERROR_OTHER; \
 } while (0)
-
 
 /*
  *  This flow is of commands is based on an USB capture of
@@ -380,6 +420,23 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 		FLASH_WRITE(addr, flash_block, rdbytes);
 	}
 
+	if (do_verify) {
+		fseek(f, 0, SEEK_SET);
+
+		for (addr = 0; !feof(f); addr += sizeof(flash_block)) {
+			rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
+
+			if (rdbytes < sizeof(flash_block) && !feof(f)) {
+				perror("fread");
+				return LIBUSB_ERROR_OTHER;
+			}
+
+			/* On error don't return immediately... finish resetting the board */
+			if (send_flash_verify(handle, addr, flash_block, rdbytes) != 0)
+				break;
+		}
+	}
+
 	SEND_COMMAND("set vectorcatch 0");
 	SEND_COMMAND("debug disable");
 
@@ -400,9 +457,13 @@ int main(int argc, char *argv[])
 	FILE *f = NULL;
 
 	if (argc < 2) {
-		printf("usage: %s <binary-file>\n", argv[0]);
+		printf("usage: %s [-v] <binary-file>\n", argv[0]);
+		printf("\t-v : enables verification after write\n");
 		goto done;
 	}
+
+	if ((argc == 3) && (strncmp(argv[1], "-v", strlen("-v")) == 0))
+		do_verify = 1;
 
 	if (libusb_init(&ctx) != 0) {
 		fprintf(stderr, "Error initializing libusb\n");
@@ -423,7 +484,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	f = fopen(argv[1], "rb");
+	f = fopen(argv[argc - 1], "rb");
 	if (!f) {
 		perror("fopen");
 		retval = 1;
