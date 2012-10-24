@@ -33,20 +33,30 @@
 #define ICDI_VID 0x1cbe
 #define ICDI_PID 0x00fd
 
-// Flash Patch and Breakpoint: see ARM Debug Interface V5 Architecture Specification
-static const uint32_t FPB     = 0xe0002000;
+// FlashPatch Control Register: see ARM Av7mRM C1.11.3
+static const uint32_t FP_CTRL  = 0xe0002000;
 
-// Rom Control: see Stellaris LM4F120H5QR Microcontroller Page XXX
-static const uint32_t XXX1CTL  = 0x400fe000;
-static const uint32_t XXX2CTL  = 0xe000edf0;
-static const uint32_t XXX3CTL  = 0x400fe060;
-static const uint32_t XXX4CTL  = 0x400fe1a0;
+// Debug Halting Control and Status Register: see ARM Av7mRM C1.6.2
+static const uint32_t DHCSR    = 0xe000edf0;
+
+// Device Identification: see Stellaris LM4F120H5QR Microcontroller Section 5.5
+static const uint32_t DID0     = 0x400fe000;
+static const uint32_t DID1     = 0x400fe004;
+
+// Device Identification: see Stellaris LM4F120H5QR Microcontroller Section 5.5
+static const uint32_t DC0      = 0x400fe008;
+
+// Run-Mode Clock Configuration: Stellaris LM4F120H5QR Microcontroller Section 5.5
+static const uint32_t RCC      = 0x400fe060;
+
+// Non-Volatile Memory Information: Stellaris LM4F120H5QR Microcontroller Section 5.6
+static const uint32_t NVMSTAT  = 0x400fe1a0;
 
 // Rom Control: see Stellaris LM4F120H5QR Microcontroller Page 531
-static const uint32_t ROMCTL  = 0x400fe0f0;
+static const uint32_t ROMCTL   = 0x400fe0f0;
 
 // Flash Memory Address: see Stellaris LM4F120H5QR Microcontroller Page 497
-static const uint32_t FMA     = 0x400fd000;
+static const uint32_t FMA      = 0x400fd000;
 
 static const uint8_t INTERFACE_NR = 0x02;
 static const uint8_t ENDPOINT_IN  = 0x83;
@@ -372,42 +382,42 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	SEND_COMMAND("debug clock \0");
 	SEND_STRING("qSupported");
 	SEND_STRING("?");
-	MEM_WRITE(FPB, 0x3000000);
-	MEM_READ(XXX1CTL, &val);
-	MEM_READ(XXX1CTL + 4, &val);
+	MEM_WRITE(FP_CTRL, 0x3000000);
+	MEM_READ(DID0, &val);
+	MEM_READ(DID1, &val);
 	SEND_STRING("?");
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 	SEND_COMMAND("debug sreset");
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 	MEM_READ(ROMCTL, &val);
 	MEM_WRITE(ROMCTL, 0x0);
-	MEM_READ(XXX2CTL, &val);
-	MEM_READ(XXX3CTL, &val);
-	MEM_READ(XXX1CTL, &val);
-	MEM_READ(XXX1CTL + 4, &val);
-	MEM_READ(XXX1CTL + 8, &val);
-	MEM_READ(XXX1CTL, &val);
-	MEM_READ(XXX4CTL, &val);
+	MEM_READ(DHCSR, &val);
+	MEM_READ(RCC, &val);
+	MEM_READ(DID0, &val);
+	MEM_READ(DID1, &val);
+	MEM_READ(DC0, &val);
+	MEM_READ(DID0, &val);
+	MEM_READ(NVMSTAT, &val);
 
 	/* XXX: Repeated below, why? */
 	MEM_WRITE(FMA, 0x0);
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 	FLASH_ERASE(0, 0);
 	SEND_COMMAND("debug creset");
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 
-	MEM_WRITE(XXX2CTL, 0x0);
+	MEM_WRITE(DHCSR, 0x0);
 
 	/* XXX: this is the same sequence of the above commands? */
 	MEM_WRITE(FMA, 0x200);
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 	FLASH_ERASE(0, 0);
 	SEND_COMMAND("debug creset");
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 
 	MEM_READ(ROMCTL, &val);
 	MEM_WRITE(ROMCTL, 0x0);
-	MEM_READ(XXX2CTL, &val);
+	MEM_READ(DHCSR, &val);
 
 	for (addr = 0; !feof(f); addr += sizeof(flash_block)) {
 		rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
@@ -441,7 +451,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	SEND_COMMAND("debug disable");
 
 	/* reset board */
-	MEM_WRITE(FPB, 0x3000000);
+	MEM_WRITE(FP_CTRL, 0x3000000);
 	SEND_COMMAND("debug hreset");
 	SEND_COMMAND("set vectorcatch 0");
 	SEND_COMMAND("debug disable");
