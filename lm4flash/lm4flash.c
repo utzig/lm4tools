@@ -105,31 +105,47 @@ static int do_verify = 0;
 
 #define cpu_to_le32 le32_to_cpu
 
+#ifdef DEBUG
+static void pretty_print_buf(uint8_t *b, int size)
+{
+#define PP_LINESIZE    80
+#define PP_NUM_P_LINE  16
+#define PP_HEX_COL     7
+#define PP_ASC_COL     56
+
+	int i, pos;
+	char linebuf[PP_LINESIZE];
+
+	memset(linebuf, ' ', sizeof linebuf);
+	linebuf[PP_ASC_COL + PP_NUM_P_LINE] = 0;
+	for (i = 0; i < size; i++) {
+		if (((i % PP_NUM_P_LINE) == 0)) {
+			if (i) {
+				printf("%s\n", linebuf);
+				memset(linebuf, ' ', sizeof linebuf);
+				linebuf[PP_ASC_COL + PP_NUM_P_LINE] = 0;
+			}
+			sprintf(linebuf, "%04x : ", i);
+			linebuf[PP_ASC_COL] = ' ';
+			linebuf[PP_HEX_COL] = ' ';
+		}
+		pos = PP_HEX_COL + ((i % PP_NUM_P_LINE) * 3);
+		sprintf(linebuf + pos, "%02x", b[i]);
+		linebuf[pos + 2] = ' ';
+		linebuf[(i % PP_NUM_P_LINE) + PP_ASC_COL] = isprint(b[i]) ? b[i] : '.';
+	}
+	printf("%s\n", linebuf);
+}
+#endif
+
 static int send_command(libusb_device_handle *handle, int size)
 {
 	int transferred = 0;
 	int retval;
 
 #ifdef DEBUG
-	{
-	int i, col;
-	char ascbuf[32];
-
-	printf("send_command: size=%d\n",size);
-	printf("buffer:\n");
-	memset(ascbuf,0,sizeof(ascbuf));
-	for (i = 0, col = 1; i < size; i++, col++) {
-		printf("%02x ", buf.u8[i]);
-		ascbuf[i % 16] = isprint(buf.u8[i]) ? buf.u8[i] : '.';
-
-		if (col == 16) { col = 0; printf("%s\n",ascbuf); memset(ascbuf,0,sizeof ascbuf); }
-	}
-
-	while(col++ < 17) {
-		printf("   ");
-	}
-	printf("%s\n",ascbuf);
-	}
+	printf(">>> sending %d bytes\n", size);
+	pretty_print_buf(buf.u8, size);
 #endif
 
 	retval = libusb_bulk_transfer(handle, ENDPOINT_OUT, buf.u8, size, &transferred, 0);
@@ -150,18 +166,8 @@ static int wait_response(libusb_device_handle *handle, int *size)
 	}
 
 #ifdef DEBUG
-	{
-	int i;
-
-	printf("wait_response: size=%d\n", *size);
-	printf("buffer: ");
-	for (i = 0; i < *size; i++)
-		printf("0x%02x ", buf.u8[i]);
-	putchar('\'');
-	for (i = 0; i < *size; i++)
-		putchar(isprint(buf.u8[i]) ? buf.u8[i] : '.' );
-	printf("'\n");
-	}
+	printf("<<< received %d bytes\n", *size);
+	pretty_print_buf(buf.u8, *size);
 #endif
 
 	return retval;
