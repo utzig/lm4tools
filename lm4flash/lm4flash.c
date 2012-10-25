@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -110,14 +111,25 @@ static int send_command(libusb_device_handle *handle, int size)
 	int retval;
 
 #ifdef DEBUG
+	{
 	int i, col;
+	char ascbuf[32];
 
+	printf("send_command: size=%d\n",size);
 	printf("buffer:\n");
+	memset(ascbuf,0,sizeof(ascbuf));
 	for (i = 0, col = 1; i < size; i++, col++) {
 		printf("%02x ", buf.u8[i]);
-		if (col == 16) { col = 0; printf("\n"); }
+		ascbuf[i % 16] = isprint(buf.u8[i]) ? buf.u8[i] : '.';
+
+		if (col == 16) { col = 0; printf("%s\n",ascbuf); memset(ascbuf,0,sizeof ascbuf); }
 	}
-	printf("\n");
+
+	while(col++ < 17) {
+		printf("   ");
+	}
+	printf("%s\n",ascbuf);
+	}
 #endif
 
 	retval = libusb_bulk_transfer(handle, ENDPOINT_OUT, buf.u8, size, &transferred, 0);
@@ -131,9 +143,6 @@ static int send_command(libusb_device_handle *handle, int size)
 static int wait_response(libusb_device_handle *handle, int *size)
 {
 	int retval;
-#ifdef DEBUG
-	int i;
-#endif
 
 	retval = libusb_bulk_transfer(handle, ENDPOINT_IN, buf.u8, BUF_SIZE, size, 0);
 	if (retval != 0) {
@@ -141,11 +150,18 @@ static int wait_response(libusb_device_handle *handle, int *size)
 	}
 
 #ifdef DEBUG
+	{
+	int i;
+
 	printf("wait_response: size=%d\n", *size);
 	printf("buffer: ");
 	for (i = 0; i < *size; i++)
 		printf("0x%02x ", buf.u8[i]);
-	printf("\n");
+	putchar('\'');
+	for (i = 0; i < *size; i++)
+		putchar(isprint(buf.u8[i]) ? buf.u8[i] : '.' );
+	printf("'\n");
+	}
 #endif
 
 	return retval;
