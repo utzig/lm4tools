@@ -483,6 +483,14 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	return 0;
 }
 
+
+enum flasher_error {
+	FLASHER_SUCCESS,
+	FLASHER_ERR_LIBUSB_FAILURE,
+	FLASHER_ERR_NO_DEVICES,
+	FLASHER_ERR_MULTIPLE_DEVICES,
+};
+
 int main(int argc, char *argv[])
 {
 	libusb_context *ctx = NULL;
