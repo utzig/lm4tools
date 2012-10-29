@@ -491,6 +491,112 @@ enum flasher_error {
 	FLASHER_ERR_MULTIPLE_DEVICES,
 };
 
+
+static
+enum flasher_error
+flasher_find_matching_device(
+	libusb_context *ctx,
+	libusb_device **matching_device_out,
+	enum libusb_error *libusb_error_out,
+	int vendor_id,
+	int product_id,
+	const char *serial)
+{
+	struct libusb_device_descriptor device_descriptor;
+	char descriptor_buffer[256];
+	libusb_device **device_list = NULL;
+	libusb_device *matching_device = NULL;
+	libusb_device_handle *handle;
+	enum flasher_error flasher_error;
+	enum libusb_error libusb_error;
+
+	int retval;
+	int device_count;
+	int device_index;
+
+	/* Enumberate all USB devices */
+	retval = libusb_get_device_list(ctx, &device_list);
+	if (retval < 0) {
+		libusb_error = retval;
+		flasher_error = FLASHER_ERR_LIBUSB_FAILURE;
+		fprintf(stderr, "Unable to get enumerate USB devices: %s\n",
+			libusb_error_name(libusb_error));
+		goto out;
+	} else {
+		device_count = retval;
+		flasher_error = FLASHER_SUCCESS;
+		libusb_error = LIBUSB_SUCCESS;
+	}
+
+	/* Assume no devices were found */
+	flasher_error = FLASHER_ERR_NO_DEVICES;
+
+	/* Walk the list of devices and try to match some */
+	for (device_index = 0; device_index < device_count; ++device_index) {
+		retval = libusb_get_device_descriptor(
+			device_list[device_index], &device_descriptor);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to get device descritor: %s\n",
+			  libusb_error_name(retval));
+			libusb_error = retval;
+			flasher_error = FLASHER_ERR_LIBUSB_FAILURE;
+			goto out;
+		}
+		/* Skip devices that have incorrect vendor and product IDs */
+		if (device_descriptor.idVendor != vendor_id ||
+		device_descriptor.idProduct != product_id) {
+			continue;
+		}
+		/* Open each device so that we can read the serial number */
+		retval = libusb_open(device_list[device_index], &handle);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to open USB device: %s\n",
+			  libusb_error_name(retval));
+			continue;
+		}
+		/* Read the serial number */
+		retval = libusb_get_string_descriptor_ascii(
+			handle, device_descriptor.iSerialNumber,
+			(unsigned char *)descriptor_buffer, sizeof descriptor_buffer);
+		/* Close the handle as we won't need it below */
+		libusb_close(handle);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to get device serial number: %s\n",
+			  libusb_error_name(retval));
+			continue;
+		}
+		printf("Found ICDI device with serial: %s\n", descriptor_buffer);
+		/* Skip devices with serial that does not match */
+		if (serial != NULL && strcmp(serial, descriptor_buffer) != 0)
+			continue;
+		if (matching_device == NULL) {
+			flasher_error = FLASHER_SUCCESS;
+			matching_device = device_list[device_index];
+		} else {
+			/* If there's a device found already then abort */
+			flasher_error = FLASHER_ERR_MULTIPLE_DEVICES;
+			/* Don't try returning arbitrary "first" device */
+			matching_device = NULL;
+			goto out;
+		}
+	}
+
+out:
+	/* Ref the matching device as we'll be returning it */
+	if (matching_device != NULL && matching_device_out != NULL) {
+		libusb_ref_device(matching_device);
+		*matching_device_out = matching_device;
+	}
+	/* Release the device list */
+	if (device_list != NULL)
+		libusb_free_device_list(device_list, 1);
+	/* Store libusb error if requested */
+	if (libusb_error_out != NULL)
+		*libusb_error_out = libusb_error;
+	/* Return the flasher error code */
+	return flasher_error;
+}
+
 int main(int argc, char *argv[])
 {
 	libusb_context *ctx = NULL;
