@@ -597,6 +597,16 @@ out:
 	return flasher_error;
 }
 
+
+static
+void
+flasher_usage()
+{
+	printf("usage: lm4flash [-v] [-s serial] <binary-file>\n");
+	printf("\t-v        - Enables verification after write\n");
+	printf("\t-s SERIAL - Flash device with the following serial\n");
+}
+
 int main(int argc, char *argv[])
 {
 	libusb_context *ctx = NULL;
