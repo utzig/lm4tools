@@ -606,42 +606,63 @@ flasher_usage()
 	printf("\t-s SERIAL - Flash device with the following serial\n");
 }
 
-int main(int argc, char *argv[])
+
+static
+int
+flasher_flash(
+	int do_verify,
+	const char *serial,
+	const char *rom_name
+	)
 {
 	libusb_context *ctx = NULL;
+	libusb_device *device = NULL;
 	libusb_device_handle *handle = NULL;
-	int retval = 1;
+	int retval;
 	FILE *f = NULL;
 
-	if (argc < 2) {
-		printf("usage: %s [-v] <binary-file>\n", argv[0]);
-		printf("\t-v : enables verification after write\n");
+	retval = libusb_init(&ctx);
+
+	if (retval != 0) {
+		fprintf(stderr, "Error initializing libusb: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
-	if ((argc == 3) && (strncmp(argv[1], "-v", strlen("-v")) == 0))
-		do_verify = 1;
-
-	if (libusb_init(&ctx) != 0) {
-		fprintf(stderr, "Error initializing libusb\n");
-		goto done;
+	switch (flasher_find_matching_device(
+			ctx, &device, &retval, ICDI_VID, ICDI_PID, serial)) {
+		case FLASHER_SUCCESS:
+			break;
+		case FLASHER_ERR_LIBUSB_FAILURE:
+			fprintf(stderr, "Error while matching ICDI devices: %s\n",
+			  libusb_error_name(retval));
+			goto done;
+		case FLASHER_ERR_NO_DEVICES:
+			fprintf(stderr, "Unable to find any ICDI devices\n");
+			goto done;
+		case FLASHER_ERR_MULTIPLE_DEVICES:
+			if (serial == NULL)
+				fprintf(stderr, "Found multiple ICDI devices\n");
+			else
+				fprintf(stderr, "Found ICDI serial number collision!\n");
+			goto done;
 	}
 
-	/* FIXME: should not be using this function call! */
-	handle = libusb_open_device_with_vid_pid(ctx, ICDI_VID, ICDI_PID);
-	if (!handle) {
-		fprintf(stderr, "No ICDI device with USB VID:PID %04x:%04x found!\n",
-				ICDI_VID, ICDI_PID);
+	retval = libusb_open(device, &handle);
+	if (retval != 0) {
+		fprintf(stderr, "Error opening selected device: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
 	retval = libusb_claim_interface(handle, INTERFACE_NR);
 	if (retval != 0) {
-		printf("Error claiming interface %d\n", retval);
+		fprintf(stderr, "Error claiming interface: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
-	f = fopen(argv[argc - 1], "rb");
+	f = fopen(rom_name, "rb");
 	if (!f) {
 		perror("fopen");
 		retval = 1;
@@ -655,8 +676,11 @@ done:
 		fclose(f);
 	if (handle)
 		libusb_close(handle);
+	if (device)
+		libusb_unref_device(device);
 	if (ctx)
 		libusb_exit(ctx);
 
 	return retval;
 }
+
