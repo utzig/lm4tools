@@ -326,6 +326,8 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 	size_t idx = snprintf(buf.c, BUF_SIZE, START "x%x,%x", addr, (uint32_t)len);
 
 	retval = checksum_and_send(handle, idx, &transfered);
+	if (retval)
+		return retval;
 
 	for (i = 0; i < transfered; i++) {
 		switch (by = buf.u8[i]) {
@@ -481,42 +483,187 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	return 0;
 }
 
-int main(int argc, char *argv[])
+
+enum flasher_error {
+	FLASHER_SUCCESS,
+	FLASHER_ERR_LIBUSB_FAILURE,
+	FLASHER_ERR_NO_DEVICES,
+	FLASHER_ERR_MULTIPLE_DEVICES,
+};
+
+
+static
+enum flasher_error
+flasher_find_matching_device(
+	libusb_context *ctx,
+	libusb_device **matching_device_out,
+	enum libusb_error *libusb_error_out,
+	int vendor_id,
+	int product_id,
+	const char *serial)
+{
+	struct libusb_device_descriptor device_descriptor;
+	char descriptor_buffer[256];
+	libusb_device **device_list = NULL;
+	libusb_device *matching_device = NULL;
+	libusb_device_handle *handle;
+	enum flasher_error flasher_error;
+	enum libusb_error libusb_error;
+
+	int retval;
+	int device_count;
+	int device_index;
+
+	/* Enumerate all USB devices */
+	retval = libusb_get_device_list(ctx, &device_list);
+	if (retval < 0) {
+		libusb_error = retval;
+		flasher_error = FLASHER_ERR_LIBUSB_FAILURE;
+		fprintf(stderr, "Unable to get enumerate USB devices: %s\n",
+			libusb_error_name(libusb_error));
+		goto out;
+	} else {
+		device_count = retval;
+		flasher_error = FLASHER_SUCCESS;
+		libusb_error = LIBUSB_SUCCESS;
+	}
+
+	/* Assume no devices were found */
+	flasher_error = FLASHER_ERR_NO_DEVICES;
+
+	/* Walk the list of devices and try to match some */
+	for (device_index = 0; device_index < device_count; ++device_index) {
+		retval = libusb_get_device_descriptor(
+			device_list[device_index], &device_descriptor);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to get device descriptor: %s\n",
+			  libusb_error_name(retval));
+			libusb_error = retval;
+			flasher_error = FLASHER_ERR_LIBUSB_FAILURE;
+			goto out;
+		}
+		/* Skip devices that have incorrect vendor and product IDs */
+		if (device_descriptor.idVendor != vendor_id ||
+		device_descriptor.idProduct != product_id) {
+			continue;
+		}
+		/* Open each device so that we can read the serial number */
+		retval = libusb_open(device_list[device_index], &handle);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to open USB device: %s\n",
+			  libusb_error_name(retval));
+			continue;
+		}
+		/* Read the serial number */
+		retval = libusb_get_string_descriptor_ascii(
+			handle, device_descriptor.iSerialNumber,
+			(unsigned char *)descriptor_buffer, sizeof descriptor_buffer);
+		/* Close the handle as we won't need it below */
+		libusb_close(handle);
+		if (retval < 0) {
+			fprintf(stderr, "Unable to get device serial number: %s\n",
+			  libusb_error_name(retval));
+			continue;
+		}
+		printf("Found ICDI device with serial: %s\n", descriptor_buffer);
+		/* Skip devices with serial that does not match */
+		if (serial != NULL && strcmp(serial, descriptor_buffer) != 0)
+			continue;
+		if (matching_device == NULL) {
+			flasher_error = FLASHER_SUCCESS;
+			matching_device = device_list[device_index];
+		} else {
+			/* If there's a device found already then abort */
+			flasher_error = FLASHER_ERR_MULTIPLE_DEVICES;
+			/* Don't try returning arbitrary "first" device */
+			matching_device = NULL;
+			goto out;
+		}
+	}
+
+out:
+	/* Ref the matching device as we'll be returning it */
+	if (matching_device != NULL && matching_device_out != NULL) {
+		libusb_ref_device(matching_device);
+		*matching_device_out = matching_device;
+	}
+	/* Release the device list */
+	if (device_list != NULL)
+		libusb_free_device_list(device_list, 1);
+	/* Store libusb error if requested */
+	if (libusb_error_out != NULL)
+		*libusb_error_out = libusb_error;
+	/* Return the flasher error code */
+	return flasher_error;
+}
+
+
+static
+void
+flasher_usage()
+{
+	printf("usage: lm4flash [-v] [-s serial] <binary-file>\n");
+	printf("\t-v        - Enables verification after write\n");
+	printf("\t-s SERIAL - Flash device with the following serial\n");
+}
+
+
+static
+int
+flasher_flash(
+	int do_verify,
+	const char *serial,
+	const char *rom_name
+	)
 {
 	libusb_context *ctx = NULL;
+	libusb_device *device = NULL;
 	libusb_device_handle *handle = NULL;
-	int retval = 1;
+	int retval;
 	FILE *f = NULL;
 
-	if (argc < 2) {
-		printf("usage: %s [-v] <binary-file>\n", argv[0]);
-		printf("\t-v : enables verification after write\n");
+	retval = libusb_init(&ctx);
+
+	if (retval != 0) {
+		fprintf(stderr, "Error initializing libusb: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
-	if ((argc == 3) && (strncmp(argv[1], "-v", strlen("-v")) == 0))
-		do_verify = 1;
-
-	if (libusb_init(&ctx) != 0) {
-		fprintf(stderr, "Error initializing libusb\n");
+	switch (flasher_find_matching_device(
+			ctx, &device, &retval, ICDI_VID, ICDI_PID, serial)) {
+	case FLASHER_SUCCESS:
+		break;
+	case FLASHER_ERR_LIBUSB_FAILURE:
+		fprintf(stderr, "Error while matching ICDI devices: %s\n",
+				libusb_error_name(retval));
+		goto done;
+	case FLASHER_ERR_NO_DEVICES:
+		fprintf(stderr, "Unable to find any ICDI devices\n");
+		goto done;
+	case FLASHER_ERR_MULTIPLE_DEVICES:
+		if (serial == NULL)
+			fprintf(stderr, "Found multiple ICDI devices\n");
+		else
+			fprintf(stderr, "Found ICDI serial number collision!\n");
 		goto done;
 	}
 
-	/* FIXME: should not be using this function call! */
-	handle = libusb_open_device_with_vid_pid(ctx, ICDI_VID, ICDI_PID);
-	if (!handle) {
-		fprintf(stderr, "No ICDI device with USB VID:PID %04x:%04x found!\n",
-				ICDI_VID, ICDI_PID);
+	retval = libusb_open(device, &handle);
+	if (retval != 0) {
+		fprintf(stderr, "Error opening selected device: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
 	retval = libusb_claim_interface(handle, INTERFACE_NR);
 	if (retval != 0) {
-		printf("Error claiming interface %d\n", retval);
+		fprintf(stderr, "Error claiming interface: %s\n",
+			libusb_error_name(retval));
 		goto done;
 	}
 
-	f = fopen(argv[argc - 1], "rb");
+	f = fopen(rom_name, "rb");
 	if (!f) {
 		perror("fopen");
 		retval = 1;
@@ -530,8 +677,39 @@ done:
 		fclose(f);
 	if (handle)
 		libusb_close(handle);
+	if (device)
+		libusb_unref_device(device);
 	if (ctx)
 		libusb_exit(ctx);
 
 	return retval;
+}
+
+
+int main(int argc, char *argv[])
+{
+	const char *serial = NULL;
+	const char *rom_name = NULL;
+	int do_verify = 0;
+	int opt;
+
+	while ((opt = getopt(argc, argv, "vs:")) != -1) {
+		switch (opt) {
+		case 'v':
+			do_verify = 1;
+			break;
+		case 's':
+			serial = optarg;
+			break;
+		default:
+			flasher_usage();
+			return EXIT_FAILURE;
+		}
+	}
+	if (optind >= argc) {
+		flasher_usage();
+		return EXIT_FAILURE;
+	} else
+		rom_name = argv[optind];
+	return flasher_flash(do_verify, serial, rom_name);
 }
