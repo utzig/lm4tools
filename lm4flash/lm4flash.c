@@ -685,3 +685,31 @@ done:
 	return retval;
 }
 
+
+int main(int argc, char *argv[])
+{
+	const char *serial = NULL;
+	const char *rom_name = NULL;
+	int do_verify = 0;
+	int opt;
+
+	while ((opt = getopt(argc, argv, "vs:")) != -1) {
+		switch (opt) {
+		case 'v':
+			do_verify = 1;
+			break;
+		case 's':
+			serial = optarg;
+			break;
+		default:
+			flasher_usage();
+			return EXIT_FAILURE;
+		}
+	}
+	if (optind >= argc) {
+		flasher_usage();
+		return EXIT_FAILURE;
+	} else
+		rom_name = argv[optind];
+	return flasher_flash(do_verify, serial, rom_name);
+}
