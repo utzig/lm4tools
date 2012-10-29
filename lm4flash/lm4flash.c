@@ -326,6 +326,8 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 	size_t idx = snprintf(buf.c, BUF_SIZE, START "x%x,%x", addr, (uint32_t)len);
 
 	retval = checksum_and_send(handle, idx, &transfered);
+	if (retval)
+		return retval;
 
 	for (i = 0; i < transfered; i++) {
 		switch (by = buf.u8[i]) {
