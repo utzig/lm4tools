@@ -331,15 +331,14 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 
 	for (i = 0; i < transfered; i++) {
 		switch (by = buf.u8[i]) {
-		case '}':
-			by = buf.u8[++i] ^ 0x20;
-			/* fall through */
-		default:
-			if (bp >= rawbuf + sizeof(rawbuf))
-				return LIBUSB_ERROR_NO_MEM;
-
-			*bp++ = by;
-			break;
+			case '}':
+				by = buf.u8[++i] ^ 0x20;
+				/* fall through */
+			default:
+				if (bp >= rawbuf + sizeof(rawbuf))
+					return LIBUSB_ERROR_NO_MEM;
+				*bp++ = by;
+				break;
 		}
 	}
 
