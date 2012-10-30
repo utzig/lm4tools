@@ -680,7 +680,6 @@ int main(int argc, char *argv[])
 {
 	const char *serial = NULL;
 	const char *rom_name = NULL;
-	int do_verify = 0;
 	int opt;
 
 	while ((opt = getopt(argc, argv, "vs:")) != -1) {
