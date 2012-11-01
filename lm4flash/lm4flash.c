@@ -207,7 +207,7 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer
 {
 	size_t i;
 	uint8_t sum = 0;
-	int retval, transfered;
+	int retval, transferred;
 	int has_ack;
 
 	if (idx + SNPRINTF_OFFSET + END_LEN > BUF_SIZE)
@@ -222,7 +222,7 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer
 	if (retval)
 		return retval;
 
-	retval = wait_response(handle, &has_ack, &transfered);
+	retval = wait_response(handle, &has_ack, &transferred);
 	if (retval)
 		return retval;
 
@@ -230,9 +230,9 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer
 		return LIBUSB_ERROR_OTHER;
 
 	if (xfer)
-		*xfer = transfered;
+		*xfer = transferred;
 
-	/* FIXME: validate transfered here? */
+	/* FIXME: validate transferred here? */
 
 	return retval;
 }
@@ -349,15 +349,15 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 {
 	size_t i, j;
 	char by, rawbuf[1024], *bp = rawbuf;
-	int retval, transfered;
+	int retval, transferred;
 
 	size_t idx = snprintf(buf.c, BUF_SIZE, START "x%x,%x", addr, (uint32_t)len);
 
-	retval = checksum_and_send(handle, idx, &transfered);
+	retval = checksum_and_send(handle, idx, &transferred);
 	if (retval)
 		return retval;
 
-	for (i = 0; i < transfered; i++) {
+	for (i = 0; i < transferred; i++) {
 		switch (by = buf.u8[i]) {
 			case '}':
 				by = buf.u8[++i] ^ 0x20;
