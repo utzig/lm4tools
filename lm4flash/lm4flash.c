@@ -88,6 +88,18 @@ static union {
 	uint32_t u32[BUF_SIZE / 4];
 } buf;
 
+void show_version(void)
+{
+	printf("%s",
+	       "LM4Flash version 0.1 - Flasher for Stellaris Launchpad ICDI boards\n"
+	       "Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>\n"
+	       "Copyright (C) 2012 Peter Stuge <peter@stuge.se>\n"
+	       "This is free software; see the source for copying conditions.  There is NO\n"
+	       "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR "
+	       "PURPOSE.\n"
+	);
+}
+
 static uint32_t le32_to_cpu(const uint32_t x)
 {
 	union {
@@ -614,9 +626,15 @@ out:
 
 static void flasher_usage()
 {
-	printf("usage: lm4flash [-v] [-s serial] <binary-file>\n");
-	printf("\t-v        - Enables verification after write\n");
-	printf("\t-s SERIAL - Flash device with the following serial\n");
+	printf("Usage: lm4flash [options] <binary-file>\n");
+	printf("\t-V\n");
+	printf("\t\tPrint version information\n");
+	printf("\t-h\n");
+	printf("\t\tPrint usage information\n");
+	printf("\t-v\n");
+	printf("\t\tEnables verification after write\n");
+	printf("\t-s SERIAL\n");
+	printf("\t\tFlash device with the following serial\n");
 }
 
 
@@ -698,8 +716,14 @@ int main(int argc, char *argv[])
 	const char *rom_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "vs:")) != -1) {
+	while ((opt = getopt(argc, argv, "Vhvs:")) != -1) {
 		switch (opt) {
+		case 'V':
+			show_version();
+			return 0;
+		case 'h':
+			flasher_usage();
+			return 0;
 		case 'v':
 			do_verify = 1;
 			break;
