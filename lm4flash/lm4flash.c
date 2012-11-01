@@ -450,7 +450,6 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_READ(DID0, &val);
 	MEM_READ(NVMSTAT, &val);
 
-	/* XXX: Repeated below, why? */
 	MEM_WRITE(FMA, 0x0);
 	MEM_READ(DHCSR, &val);
 	FLASH_ERASE(0, 0);
@@ -458,13 +457,6 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_READ(DHCSR, &val);
 
 	MEM_WRITE(DHCSR, 0x0);
-
-	/* XXX: this is the same sequence of the above commands? */
-	MEM_WRITE(FMA, 0x200);
-	MEM_READ(DHCSR, &val);
-	FLASH_ERASE(0, 0);
-	SEND_COMMAND("debug creset");
-	MEM_READ(DHCSR, &val);
 
 	MEM_READ(ROMCTL, &val);
 	MEM_WRITE(ROMCTL, 0x0);
