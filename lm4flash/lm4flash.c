@@ -156,14 +156,32 @@ static int send_command(libusb_device_handle *handle, int size)
 	return retval;
 }
 
-static int wait_response(libusb_device_handle *handle, int *size)
+static int wait_response(libusb_device_handle *handle, int *has_ack, int *size)
 {
 	int retval;
+	int transferred = 0;
 
-	retval = libusb_bulk_transfer(handle, ENDPOINT_IN, buf.u8, BUF_SIZE, size, 0);
-	if (retval != 0) {
-		printf("Error receiving data %d\n", retval);
-	}
+	*has_ack = 0;
+	*size = 0;
+
+	do {
+		retval = libusb_bulk_transfer(handle,
+		                              ENDPOINT_IN,
+		                              &buf.u8[*size],
+		                              BUF_SIZE - *size,
+		                              &transferred,
+		                              0);
+		if (retval != 0) {
+			printf("Error receiving data %d\n", retval);
+			return retval;
+		}
+
+		if (transferred >= 1 && buf.c[0] == '+')
+			*has_ack = 1;
+
+		*size += transferred;
+
+	} while ((*size < 3) || (buf.c[*size - 3] != '#'));
 
 #ifdef DEBUG
 	printf("<<< received %d bytes\n", *size);
@@ -178,6 +196,7 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer
 	size_t i;
 	uint8_t sum = 0;
 	int retval, transfered;
+	int has_ack;
 
 	if (idx + SNPRINTF_OFFSET + END_LEN > BUF_SIZE)
 		return LIBUSB_ERROR_NO_MEM;
@@ -191,16 +210,13 @@ static int checksum_and_send(libusb_device_handle *handle, size_t idx, int *xfer
 	if (retval)
 		return retval;
 
-	/* wait for ack (+/-) */
-	retval = wait_response(handle, &transfered);
+	retval = wait_response(handle, &has_ack, &transfered);
 	if (retval)
 		return retval;
 
-	if (transfered != 1 || buf.c[0] != '+')
+	if (!has_ack)
 		return LIBUSB_ERROR_OTHER;
 
-	/* wait for command response */
-	retval = wait_response(handle, &transfered);
 	if (xfer)
 		*xfer = transfered;
 
