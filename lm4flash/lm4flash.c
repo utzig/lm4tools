@@ -370,12 +370,11 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 		}
 	}
 
-	if (strncmp(rawbuf, "$OK:", 4) != 0)
+	if (strncmp(rawbuf, "+$OK:", 5) != 0)
 		return LIBUSB_ERROR_OTHER;
 
-	for (i = 0, j = strlen("$OK:"); i < len; i++, j++) {
+	for (i = 0, j = strlen("+$OK:"); i < len; i++, j++) {
 		if (bytes[i] != (uint8_t)rawbuf[j]) {
-			printf("Error verifying flash\n");
 			return LIBUSB_ERROR_OTHER;
 		}
 	}
@@ -429,6 +428,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	uint32_t val = 0;
 	uint32_t addr;
 	size_t rdbytes;
+	int retval = 0;
 
 	SEND_COMMAND("debug clock \0");
 	SEND_STRING("qSupported");
@@ -485,8 +485,11 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 			}
 
 			/* On error don't return immediately... finish resetting the board */
-			if (send_flash_verify(handle, addr, flash_block, rdbytes) != 0)
+			retval = send_flash_verify(handle, addr, flash_block, rdbytes);
+			if (retval) {
+				printf("Error verifying flash\n");
 				break;
+			}
 		}
 	}
 
@@ -499,7 +502,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	SEND_COMMAND("set vectorcatch 0");
 	SEND_COMMAND("debug disable");
 
-	return 0;
+	return retval;
 }
 
 
