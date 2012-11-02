@@ -345,10 +345,31 @@ static int send_flash_write(libusb_device_handle *handle, const uint32_t addr, c
 	return send_u8_binary(handle, prefix, rawbuf, i) ? -1 : i;
 }
 
+static int decode_buffer(char *inbuf, int insize, char *outbuf, int outsize)
+{
+	int i;
+	char by, *bp = outbuf;
+
+	for (i = 0; i < insize; i++) {
+		switch (by = inbuf[i]) {
+			case '}':
+				by = inbuf[++i] ^ 0x20;
+				/* fall through */
+			default:
+				if (bp >= outbuf + outsize)
+					return LIBUSB_ERROR_NO_MEM;
+				*bp++ = by;
+				break;
+		}
+	}
+
+	return 0;
+}
+
 static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, const uint8_t *bytes, size_t len)
 {
 	size_t i, j;
-	char by, rawbuf[1024], *bp = rawbuf;
+	char rawbuf[1024];
 	int retval, transferred;
 
 	size_t idx = snprintf(buf.c, BUF_SIZE, START "x%x,%x", addr, (uint32_t)len);
@@ -357,18 +378,7 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 	if (retval)
 		return retval;
 
-	for (i = 0; i < transferred; i++) {
-		switch (by = buf.u8[i]) {
-			case '}':
-				by = buf.u8[++i] ^ 0x20;
-				/* fall through */
-			default:
-				if (bp >= rawbuf + sizeof(rawbuf))
-					return LIBUSB_ERROR_NO_MEM;
-				*bp++ = by;
-				break;
-		}
-	}
+	decode_buffer(buf.c, transferred, rawbuf, sizeof rawbuf);
 
 	if (strncmp(rawbuf, "+$OK:", 5) != 0)
 		return LIBUSB_ERROR_OTHER;
@@ -377,6 +387,40 @@ static int send_flash_verify(libusb_device_handle *handle, const uint32_t addr, 
 		if (bytes[i] != (uint8_t)rawbuf[j]) {
 			return LIBUSB_ERROR_OTHER;
 		}
+	}
+
+	return 0;
+}
+
+static int print_icdi_version(libusb_device_handle *handle)
+{
+	int retval = 0;
+	char rawbuf[32];
+	size_t i, idx;
+	int transferred = 0;
+	const char *cmd = "version";
+
+	idx = sprintf(buf.c, START "qRcmd,");
+
+	for (i = 0; i < strlen(cmd); i++)
+		idx += sprintf(buf.c + idx, "%02x", cmd[i]);
+
+	retval = checksum_and_send(handle, idx, &transferred);
+	if (retval)
+		return retval;
+
+	decode_buffer(buf.c, transferred, rawbuf, sizeof rawbuf);
+
+	if (strncmp(rawbuf, "+$", 2) != 0)
+		return LIBUSB_ERROR_OTHER;
+
+	printf("ICDI version: ");
+	for (i = strlen("+$"); rawbuf[i] != '#'; i += 2) {
+		char r = rawbuf[i];
+		char c = (r <= '9') ? (r - '0') << 4 : (r - 'a' + 10) << 4;
+		r = rawbuf[i+1];
+		c |= (r <= '9') ? r - '0' : r - 'a' + 10;
+		printf("%c", c);
 	}
 
 	return 0;
@@ -429,6 +473,8 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	uint32_t addr;
 	size_t rdbytes;
 	int retval = 0;
+
+	print_icdi_version(handle);
 
 	SEND_COMMAND("debug clock \0");
 	SEND_STRING("qSupported");
