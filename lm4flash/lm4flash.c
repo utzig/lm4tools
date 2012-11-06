@@ -516,7 +516,12 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 			return LIBUSB_ERROR_OTHER;
 		}
 
-		FLASH_WRITE(addr, flash_block, rdbytes);
+		/*
+		 * Avoid writing a buffer with zero-sized content which can
+		 * happen when the input file has a size multiple of flash_block
+		 */
+		if (rdbytes)
+			FLASH_WRITE(addr, flash_block, rdbytes);
 	}
 
 	if (do_verify) {
