@@ -198,6 +198,7 @@ main(int argc, char *argv[])
     if (rc != 0)
     {
         TRACE(ALWAYS, "Failed to open device.  rc = %d\n", rc);
+        libusb_free_device_list(pDevices, 1);
         goto out;
     }
 
