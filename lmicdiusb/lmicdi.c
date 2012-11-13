@@ -198,6 +198,7 @@ main(int argc, char *argv[])
     if (rc != 0)
     {
         TRACE(ALWAYS, "Failed to open device.  rc = %d\n", rc);
+        goto out;
     }
 
     //
@@ -363,6 +364,7 @@ found:
     TRACE(1, "%s: libusb_close(phDev)\n", __FUNCTION__);
     libusb_close(phDev);
 
+out:
     TRACE(1, "%s: libusb_exit\n", __FUNCTION__);
     libusb_exit(pCtx);
 
