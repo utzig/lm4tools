@@ -1,0 +1,286 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2D9CE71B13D7DE8B00AE55E3 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2D9CE71913D7DE8B00AE55E3 /* InfoPlist.strings */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		2D9CE71113D7DE8B00AE55E3 /* lm4f120icdi.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = lm4f120icdi.kext; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D9CE71513D7DE8B00AE55E3 /* Kernel.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Kernel.framework; path = System/Library/Frameworks/Kernel.framework; sourceTree = SDKROOT; };
+		2D9CE71813D7DE8B00AE55E3 /* lm4f120icdi-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "lm4f120icdi-Info.plist"; sourceTree = "<group>"; };
+		2D9CE71A13D7DE8B00AE55E3 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2D9CE70C13D7DE8B00AE55E3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2D9CE70413D7DE8B00AE55E3 = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71613D7DE8B00AE55E3 /* lm4f120icdi */,
+				2D9CE71313D7DE8B00AE55E3 /* Frameworks */,
+				2D9CE71213D7DE8B00AE55E3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2D9CE71213D7DE8B00AE55E3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71113D7DE8B00AE55E3 /* lm4f120icdi.kext */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2D9CE71313D7DE8B00AE55E3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71413D7DE8B00AE55E3 /* Other Frameworks */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2D9CE71413D7DE8B00AE55E3 /* Other Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71513D7DE8B00AE55E3 /* Kernel.framework */,
+			);
+			name = "Other Frameworks";
+			sourceTree = "<group>";
+		};
+		2D9CE71613D7DE8B00AE55E3 /* lm4f120icdi */ = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71713D7DE8B00AE55E3 /* Supporting Files */,
+			);
+			path = lm4f120icdi;
+			sourceTree = "<group>";
+		};
+		2D9CE71713D7DE8B00AE55E3 /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				2D9CE71813D7DE8B00AE55E3 /* lm4f120icdi-Info.plist */,
+				2D9CE71913D7DE8B00AE55E3 /* InfoPlist.strings */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		2D9CE70D13D7DE8B00AE55E3 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		2D9CE71013D7DE8B00AE55E3 /* lm4f120icdi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2D9CE72313D7DE8B00AE55E3 /* Build configuration list for PBXNativeTarget "lm4f120icdi" */;
+			buildPhases = (
+				2D9CE70B13D7DE8B00AE55E3 /* Sources */,
+				2D9CE70C13D7DE8B00AE55E3 /* Frameworks */,
+				2D9CE70D13D7DE8B00AE55E3 /* Headers */,
+				2D9CE70E13D7DE8B00AE55E3 /* Resources */,
+				2D9CE70F13D7DE8B00AE55E3 /* Rez */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = lm4f120icdi;
+			productName = lm4f120icdi;
+			productReference = 2D9CE71113D7DE8B00AE55E3 /* lm4f120icdi.kext */;
+			productType = "com.apple.product-type.kernel-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2D9CE70613D7DE8B00AE55E3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0450;
+			};
+			buildConfigurationList = 2D9CE70913D7DE8B00AE55E3 /* Build configuration list for PBXProject "lm4f120icdi" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 2D9CE70413D7DE8B00AE55E3;
+			productRefGroup = 2D9CE71213D7DE8B00AE55E3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2D9CE71013D7DE8B00AE55E3 /* lm4f120icdi */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2D9CE70E13D7DE8B00AE55E3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D9CE71B13D7DE8B00AE55E3 /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXRezBuildPhase section */
+		2D9CE70F13D7DE8B00AE55E3 /* Rez */ = {
+			isa = PBXRezBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXRezBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2D9CE70B13D7DE8B00AE55E3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		2D9CE71913D7DE8B00AE55E3 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				2D9CE71A13D7DE8B00AE55E3 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		2D9CE72113D7DE8B00AE55E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = lm4f120icdi;
+				SDKROOT = macosx;
+				VALID_ARCHS = x86_64;
+			};
+			name = Debug;
+		};
+		2D9CE72213D7DE8B00AE55E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.7;
+				PRODUCT_NAME = lm4f120icdi;
+				SDKROOT = macosx;
+				VALID_ARCHS = x86_64;
+			};
+			name = Release;
+		};
+		2D9CE72413D7DE8B00AE55E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1.0.0d1;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "lm4f120icdi/lm4f120icdi-Prefix.pch";
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				INFOPLIST_FILE = "lm4f120icdi/lm4f120icdi-Info.plist";
+				MODULE_NAME = net.utzig.lm4f120icdi;
+				MODULE_VERSION = 1.0.0d1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = kext;
+			};
+			name = Debug;
+		};
+		2D9CE72513D7DE8B00AE55E3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1.0.0d1;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "lm4f120icdi/lm4f120icdi-Prefix.pch";
+				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
+				INFOPLIST_FILE = "lm4f120icdi/lm4f120icdi-Info.plist";
+				MODULE_NAME = net.utzig.lm4f120icdi;
+				MODULE_VERSION = 1.0.0d1;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = kext;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2D9CE70913D7DE8B00AE55E3 /* Build configuration list for PBXProject "lm4f120icdi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2D9CE72113D7DE8B00AE55E3 /* Debug */,
+				2D9CE72213D7DE8B00AE55E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2D9CE72313D7DE8B00AE55E3 /* Build configuration list for PBXNativeTarget "lm4f120icdi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2D9CE72413D7DE8B00AE55E3 /* Debug */,
+				2D9CE72513D7DE8B00AE55E3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2D9CE70613D7DE8B00AE55E3 /* Project object */;
+}
