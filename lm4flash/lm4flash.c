@@ -77,6 +77,7 @@ static const uint8_t ENDPOINT_OUT = 0x02;
 #define END_LEN (strlen(END) + 2)
 
 #define FLASH_BLOCK_SIZE 512
+#define FLASH_ERASE_SIZE 1024
 
 /* Prefix + potentially every flash byte escaped */
 #define BUF_SIZE 64 + 2*FLASH_BLOCK_SIZE
@@ -91,7 +92,7 @@ static union {
 void show_version(void)
 {
 	printf("%s",
-	       "LM4Flash version 0.1 - Flasher for Stellaris Launchpad ICDI boards\n"
+	       "LM4Flash version 0.1.1 - Flasher for Stellaris Launchpad ICDI boards\n"
 	       "Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>\n"
 	       "Copyright (C) 2012 Peter Stuge <peter@stuge.se>\n"
 	       "This is free software; see the source for copying conditions.  There is NO\n"
@@ -114,6 +115,7 @@ static uint32_t le32_to_cpu(const uint32_t x)
 }
 
 static int do_verify = 0;
+static int erase_used = 0;
 
 #define cpu_to_le32 le32_to_cpu
 
@@ -473,6 +475,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	uint32_t addr;
 	size_t rdbytes;
 	int retval = 0;
+	uint32_t size;
 
 	print_icdi_version(handle);
 
@@ -498,7 +501,17 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 
 	MEM_WRITE(FMA, 0x0);
 	MEM_READ(DHCSR, &val);
-	FLASH_ERASE(0, 0);
+
+	if (erase_used) {
+		fseek(f, 0, SEEK_END);
+		size = ftell(f);
+		for (addr = 0; addr < size; addr += FLASH_ERASE_SIZE)
+			FLASH_ERASE(addr, FLASH_ERASE_SIZE);
+		fseek(f, 0, SEEK_SET);
+	} else {
+		FLASH_ERASE(0, 0);
+	}
+
 	SEND_COMMAND("debug creset");
 	MEM_READ(DHCSR, &val);
 
@@ -686,6 +699,8 @@ static void flasher_usage()
 	printf("\t\tPrint usage information\n");
 	printf("\t-v\n");
 	printf("\t\tEnables verification after write\n");
+	printf("\t-E\n");
+	printf("\t\tOnly erase blocks where binary file will be written\n");
 	printf("\t-s SERIAL\n");
 	printf("\t\tFlash device with the following serial\n");
 }
@@ -769,7 +784,7 @@ int main(int argc, char *argv[])
 	const char *rom_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "Vhvs:")) != -1) {
+	while ((opt = getopt(argc, argv, "VEhvs:")) != -1) {
 		switch (opt) {
 		case 'V':
 			show_version();
@@ -777,6 +792,9 @@ int main(int argc, char *argv[])
 		case 'h':
 			flasher_usage();
 			return 0;
+		case 'E':
+			erase_used = 1;
+			break;
 		case 'v':
 			do_verify = 1;
 			break;
