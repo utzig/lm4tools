@@ -92,7 +92,7 @@ static union {
 void show_version(void)
 {
 	printf("%s",
-	       "LM4Flash version 0.1.1 - Flasher for Stellaris Launchpad ICDI boards\n"
+	       "LM4Flash version 0.1.2 - Flasher for Stellaris Launchpad ICDI boards\n"
 	       "Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>\n"
 	       "Copyright (C) 2012 Peter Stuge <peter@stuge.se>\n"
 	       "This is free software; see the source for copying conditions.  There is NO\n"
@@ -116,6 +116,7 @@ static uint32_t le32_to_cpu(const uint32_t x)
 
 static int do_verify = 0;
 static int erase_used = 0;
+static uint32_t start_addr = 0;
 
 #define cpu_to_le32 le32_to_cpu
 
@@ -505,7 +506,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	if (erase_used) {
 		fseek(f, 0, SEEK_END);
 		size = ftell(f);
-		for (addr = 0; addr < size; addr += FLASH_ERASE_SIZE)
+		for (addr = start_addr; addr < (start_addr + size); addr += FLASH_ERASE_SIZE)
 			FLASH_ERASE(addr, FLASH_ERASE_SIZE);
 		fseek(f, 0, SEEK_SET);
 	} else {
@@ -521,7 +522,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_WRITE(ROMCTL, 0x0);
 	MEM_READ(DHCSR, &val);
 
-	for (addr = 0; !feof(f); addr += sizeof(flash_block)) {
+	for (addr = start_addr; !feof(f); addr += sizeof(flash_block)) {
 		rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
 
 		if (rdbytes < sizeof(flash_block) && !feof(f)) {
@@ -540,7 +541,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	if (do_verify) {
 		fseek(f, 0, SEEK_SET);
 
-		for (addr = 0; !feof(f); addr += sizeof(flash_block)) {
+		for (addr = start_addr; !feof(f); addr += sizeof(flash_block)) {
 			rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
 
 			if (rdbytes < sizeof(flash_block) && !feof(f)) {
@@ -701,6 +702,8 @@ static void flasher_usage()
 	printf("\t\tEnables verification after write\n");
 	printf("\t-E\n");
 	printf("\t\tOnly erase blocks where binary file will be written\n");
+	printf("\t-S address\n");
+	printf("\t\tWrite binary at the given address (in hexadecimal)\n");
 	printf("\t-s SERIAL\n");
 	printf("\t\tFlash device with the following serial\n");
 }
@@ -784,7 +787,7 @@ int main(int argc, char *argv[])
 	const char *rom_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "VEhvs:")) != -1) {
+	while ((opt = getopt(argc, argv, "VES:hvs:")) != -1) {
 		switch (opt) {
 		case 'V':
 			show_version();
@@ -793,6 +796,11 @@ int main(int argc, char *argv[])
 			flasher_usage();
 			return 0;
 		case 'E':
+			erase_used = 1;
+			break;
+		case 'S':
+			start_addr = strtol(optarg, NULL, 16);
+			/* force erasing only the used blocks */
 			erase_used = 1;
 			break;
 		case 'v':
@@ -812,6 +820,11 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	} else
 		rom_name = argv[optind];
+
+	if (start_addr && (start_addr % FLASH_ERASE_SIZE)) {
+		printf("Address given to -S must be 0x%x aligned\n", FLASH_ERASE_SIZE);
+		return EXIT_FAILURE;
+	}
 
 	return flasher_flash(serial, rom_name);
 }
