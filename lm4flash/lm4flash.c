@@ -307,9 +307,14 @@ static int send_mem_read(libusb_device_handle *handle, const uint32_t addr, uint
 	int retval = send_u32(handle, "x", addr, ",4");
 	if (retval)
 		return retval;
-
-	if (val)
-		*val = le32_to_cpu(buf.u32[0]);
+	if (val) {
+		uint32_t u = 0;
+		u |= buf.u8[8] << 24;
+		u |= buf.u8[7] << 16;
+		u |= buf.u8[6] << 8;
+		u |= buf.u8[5];
+		*val = le32_to_cpu(u);
+	}
 
 	return 0;
 }
