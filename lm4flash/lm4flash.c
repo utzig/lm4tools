@@ -92,7 +92,7 @@ static union {
 void show_version(void)
 {
 	printf("%s",
-	       "LM4Flash version 0.1.2 - Flasher for Stellaris Launchpad ICDI boards\n"
+	       "LM4Flash version 0.1.3 - Flasher for Stellaris Launchpad ICDI boards\n"
 	       "Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>\n"
 	       "Copyright (C) 2012 Peter Stuge <peter@stuge.se>\n"
 	       "This is free software; see the source for copying conditions.  There is NO\n"
