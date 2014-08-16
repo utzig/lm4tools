@@ -730,7 +730,7 @@ static int flasher_flash(const char *serial, const char *rom_name)
 		goto done;
 	}
 
-	switch (flasher_find_matching_device(
+	switch (retval = flasher_find_matching_device(
 	        ctx, &device, &retval, ICDI_VID, ICDI_PID, serial)) {
 	case FLASHER_SUCCESS:
 		break;
