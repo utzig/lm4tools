@@ -160,6 +160,7 @@ Listen(unsigned int iPort)
     unsigned int addrlen;
    	struct   sockaddr_in sin;
 	struct   sockaddr_in pin;
+	int so_reuseaddr = 1;
     int sdListen;
 
     //
@@ -169,6 +170,13 @@ Listen(unsigned int iPort)
 		perror("socket");
 		return(-1);
 	}
+
+	// Attempt to set SO_REUSEADDR to avoid "address already in use" errors
+	setsockopt(sdListen,
+		   SOL_SOCKET,
+		   SO_REUSEADDR,
+		   &so_reuseaddr,
+		   sizeof(so_reuseaddr));
 
     //
     // Set up to listen on all interfaces/addresses and port iPort
