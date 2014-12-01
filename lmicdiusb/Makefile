@@ -43,6 +43,12 @@ ifeq ($(shell uname),Darwin)
 	LDFLAGS += -framework AppKit -framework Carbon -framework IOKit
 endif
 
+ifeq ($(shell uname),FreeBSD)
+	LIBUSB_CFLAGS :=
+	LIBUSB_LIBDIR := /usr/lib
+	LIBUSB_LIBS := -lusb
+endif
+
 ifeq ($(shell uname),Linux)
 	LIBUSB_CFLAGS ?= $(shell pkg-config --cflags libusb-1.0)
 	LIBUSB_LIBDIR ?= $(shell pkg-config --variable=libdir libusb-1.0)
