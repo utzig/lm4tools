@@ -114,6 +114,7 @@ static uint32_t le32_to_cpu(const uint32_t x)
 	return _tmp.b32;
 }
 
+static int do_unlock = 0;
 static int do_verify = 0;
 static int erase_used = 0;
 static uint32_t start_addr = 0;
@@ -470,6 +471,18 @@ static int print_icdi_version(libusb_device_handle *handle)
 		return LIBUSB_ERROR_OTHER; \
 } while (0)
 
+
+
+static int unlock_device(libusb_device_handle *handle)
+{
+  print_icdi_version(handle);
+  printf("Attempting device unlock...");
+
+  SEND_COMMAND("debug unlock");
+  
+  return 1;
+}
+
 /*
  *  This flow is of commands is based on an USB capture of
  *  traffic between LM Flash Programmer and the Stellaris Launchpad
@@ -711,6 +724,8 @@ static void flasher_usage()
 	printf("\t\tWrite binary at the given address (in hexadecimal)\n");
 	printf("\t-s SERIAL\n");
 	printf("\t\tFlash device with the following serial\n");
+	printf("\t-U\n");
+	printf("\t\tUnlock the debug port\n");
 }
 
 
@@ -763,14 +778,18 @@ static int flasher_flash(const char *serial, const char *rom_name)
 		goto done;
 	}
 
-	f = fopen(rom_name, "rb");
-	if (!f) {
-		perror("fopen");
-		retval = 1;
-		goto done;
-	}
+	if (do_unlock == 0) {
+	  f = fopen(rom_name, "rb");
+	  if (!f) {
+	    perror("fopen");
+	    retval = 1;
+	    goto done;
+	  }
 
-	retval = write_firmware(handle, f);
+	  retval = write_firmware(handle, f);
+	}
+	else
+	  retval = unlock_device(handle);
 
 done:
 	if (f)
@@ -792,7 +811,7 @@ int main(int argc, char *argv[])
 	const char *rom_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "VES:hvs:")) != -1) {
+	while ((opt = getopt(argc, argv, "UVES:hvs:")) != -1) {
 		switch (opt) {
 		case 'V':
 			show_version();
@@ -814,12 +833,18 @@ int main(int argc, char *argv[])
 		case 's':
 			serial = optarg;
 			break;
+		case 'U':
+		        do_unlock = 1;
+			break;
 		default:
 			flasher_usage();
 			return EXIT_FAILURE;
 		}
 	}
 
+	if (do_unlock == 1)
+	  return flasher_flash(serial, rom_name);
+	
 	if (optind >= argc) {
 		flasher_usage();
 		return EXIT_FAILURE;
