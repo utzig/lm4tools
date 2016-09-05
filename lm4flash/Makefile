@@ -1,9 +1,14 @@
 EXE := lm4flash
 
 CC ?= gcc
+CFLAGS += -Wall
 
-CFLAGS := -Wall $(shell pkg-config --cflags libusb-1.0)
-LDFLAGS := $(shell pkg-config --libs libusb-1.0)
+ifeq ($(shell uname),FreeBSD)
+LDFLAGS += -lusb
+else
+CFLAGS += $(shell pkg-config --cflags libusb-1.0)
+LDFLAGS += $(shell pkg-config --libs libusb-1.0)
+endif
 
 all: CFLAGS += -O2
 all: $(EXE)
