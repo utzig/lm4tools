@@ -10,8 +10,10 @@ CFLAGS += $(shell pkg-config --cflags libusb-1.0)
 LDFLAGS += $(shell pkg-config --libs libusb-1.0)
 endif
 
-all: CFLAGS += -O2
 all: $(EXE)
+
+release: CFLAGS += -O2
+release: $(EXE)
 
 debug: CFLAGS += -g -DDEBUG
 debug: $(EXE)
