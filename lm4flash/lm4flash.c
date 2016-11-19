@@ -482,6 +482,12 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	size_t rdbytes;
 	int retval = 0;
 	uint32_t size;
+	long offset;
+	double elapsed;
+	double speed;
+	double percentage;
+	double eta;
+	struct timeval tic, toc;
 
 	print_icdi_version(handle);
 
@@ -508,14 +514,14 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_WRITE(FMA, 0x0);
 	MEM_READ(DHCSR, &val);
 
-    fseek(f, 0, SEEK_END);
-    size = ftell(f);
-    fseek(f, 0, SEEK_SET);
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	fseek(f, 0, SEEK_SET);
 
 	if (erase_used) {
-        for (addr = start_addr; addr < (start_addr + size); addr += FLASH_ERASE_SIZE) {
-            FLASH_ERASE(addr, FLASH_ERASE_SIZE);
-        }
+		for (addr = start_addr; addr < (start_addr + size); addr += FLASH_ERASE_SIZE) {
+			FLASH_ERASE(addr, FLASH_ERASE_SIZE);
+		}
 	} else {
 		FLASH_ERASE(0, 0);
 	}
@@ -529,9 +535,7 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_WRITE(ROMCTL, 0x0);
 	MEM_READ(DHCSR, &val);
 
-    double eta = 0, speed = 0;
-    struct timeval tic = { 0 };
-    gettimeofday(&tic, NULL);
+	gettimeofday(&tic, NULL);
 
 	for (addr = start_addr; !feof(f); addr += sizeof(flash_block)) {
 		rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
@@ -541,25 +545,24 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 			return LIBUSB_ERROR_OTHER;
 		}
 
-        const long offset = ftell(f);
-        const double percentage = (double)offset / size;
+		offset = ftell(f);
+		percentage = (double)offset / size;
 		/*
 		 * Avoid writing a buffer with zero-sized content which can
 		 * happen when the input file has a size multiple of flash_block
 		 */
 		if (rdbytes) {
-            printf("\rwriting: 0x%x, speed: %.2fKB/s, progress: %.2lf%%, ETA: %.2lfs ",
-                    addr, speed, percentage*100.f, eta);
-            fflush(stdout);
+			printf("\rwriting: 0x%x, speed: %.2fKB/s, progress: %.2lf%%, ETA: %.2lfs ",
+					addr, speed, percentage*100.f, eta);
+			fflush(stdout);
 			FLASH_WRITE(addr, flash_block, rdbytes);
-        }
+		}
 
-        struct timeval toc = { 0 };
-        gettimeofday(&toc, NULL);
-        double elapsed = (toc.tv_sec - tic.tv_sec) * 1000.0;     // sec to ms
-        elapsed += (toc.tv_usec - tic.tv_usec) / 1000.0;         // us to ms
-        eta = elapsed * (1/percentage - 1) / 1000.f;
-        speed = offset / elapsed * 1000.f / 1024;
+		gettimeofday(&toc, NULL);
+		elapsed = (toc.tv_sec - tic.tv_sec) * 1000.0; // sec to ms
+		elapsed += (toc.tv_usec - tic.tv_usec) / 1000.0; // us to ms
+		eta = elapsed * (1/percentage - 1) / 1000.f;
+		speed = offset / elapsed * 1000.f / 1024;
 	}
 
 	if (do_verify) {
@@ -849,8 +852,9 @@ int main(int argc, char *argv[])
 		printf("Address given to -S must be 0x%x aligned\n", FLASH_ERASE_SIZE);
 		return EXIT_FAILURE;
 	} else {
-        printf("flash start address 0x%X (%dK)\n", start_addr, start_addr / FLASH_ERASE_SIZE);
-    }
+		printf("flash start address 0x%X (%dK)\n",
+			   start_addr, start_addr / FLASH_ERASE_SIZE);
+	}
 
 	return flasher_flash(serial, rom_name);
 }
