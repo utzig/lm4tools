@@ -552,8 +552,8 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 		 * happen when the input file has a size multiple of flash_block
 		 */
 		if (rdbytes) {
-			printf("\rwriting: 0x%x, speed: %.2fKB/s, progress: %.2lf%%, ETA: %.2lfs ",
-					addr, speed, percentage*100.f, eta);
+			printf("\rwriting: 0x%x, speed: %.2fKB/s, progress: %.2f%%, ETA: %.2fs ",
+					addr, (float)speed, (float)(percentage*100.f), (float)eta);
 			fflush(stdout);
 			FLASH_WRITE(addr, flash_block, rdbytes);
 		}
