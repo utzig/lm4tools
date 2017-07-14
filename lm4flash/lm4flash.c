@@ -616,14 +616,10 @@ flasher_find_matching_device(
 	const char *serial)
 {
 	struct libusb_device_descriptor device_descriptor;
-#ifndef __APPLE__
 	char descriptor_buffer[256];
-#endif
 	libusb_device **device_list = NULL;
 	libusb_device *matching_device = NULL;
-#ifndef __APPLE__
 	libusb_device_handle *handle;
-#endif
 	enum flasher_error flasher_error;
 	enum libusb_error libusb_error;
 
@@ -665,7 +661,6 @@ flasher_find_matching_device(
 			continue;
 		}
 
-#ifndef __APPLE__
 		/* Open each device so that we can read the serial number */
 		retval = libusb_open(device_list[device_index], &handle);
 		if (retval < 0) {
@@ -688,7 +683,6 @@ flasher_find_matching_device(
 		/* Skip devices with serial that does not match */
 		if (serial != NULL && strcmp(serial, descriptor_buffer) != 0)
 			continue;
-#endif
 		if (matching_device == NULL) {
 			flasher_error = FLASHER_SUCCESS;
 			matching_device = device_list[device_index];
