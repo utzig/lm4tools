@@ -25,7 +25,8 @@ install: $(EXE)
 ifndef PREFIX
 	$(error PREFIX is not set)
 endif
-	install $^ $(PREFIX)/bin/$^
+	mkdir -p $(PREFIX)/bin
+	install $^ $(PREFIX)/bin/
 
 clean:
 	rm -f *.o $(EXE)
