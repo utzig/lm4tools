@@ -67,6 +67,12 @@ lmicdi: lmicdi.o socket.o gdb.o $(LIBUSB_LIBS)
 
 lmicdi.o socket.o: lmicdi.h
 
+install: lmicdi
+ifndef PREFIX
+	$(error PREFIX is not set)
+endif
+	@install $^ $(PREFIX)/bin/$^
+
 .PHONY: all clean
 
 clean:

@@ -21,6 +21,12 @@ debug: $(EXE)
 $(EXE): $(EXE).c
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 
+install: $(EXE)
+ifndef PREFIX
+	$(error PREFIX is not set)
+endif
+	install $^ $(PREFIX)/bin/$^
+
 clean:
 	rm -f *.o $(EXE)
 
