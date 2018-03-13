@@ -1,5 +1,5 @@
 /* lm4flash - TI Stellaris Launchpad ICDI flasher
- * Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>
+ * Copyright (C) 2012-2018 Fabio Utzig <utzig@utzig.org>
  * Copyright (C) 2012 Peter Stuge <peter@stuge.se>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -93,7 +93,7 @@ void show_version(void)
 {
 	printf("%s",
 	       "LM4Flash version 0.1.3 - Flasher for Stellaris Launchpad ICDI boards\n"
-	       "Copyright (C) 2012 Fabio Utzig <fabio@utzig.net>\n"
+	       "Copyright (C) 2012-2018 Fabio Utzig <utzig@utzig.org>\n"
 	       "Copyright (C) 2012 Peter Stuge <peter@stuge.se>\n"
 	       "This is free software; see the source for copying conditions.  There is NO\n"
 	       "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR "
