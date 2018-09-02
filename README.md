@@ -34,3 +34,12 @@ To flash your Stellaris board from *boards/ek-lm4f120xl/project0*, run:
 $ lm4flash gcc/project0.bin
 
 Nice hacking!
+
+__Optional: Remove the root requirement__
+
+By default, root permissions are required to flash the Stellaris Launchpad ICDI. This can be circumvented by adding udev rules.
+Create a file called */etc/udev/rules.d/61.stellpad.rules*, containing:
+```
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1cbe", ATTRS{idProduct}=="00fd", MODE="0666"
+```
+Restart udev to apply the changes.
