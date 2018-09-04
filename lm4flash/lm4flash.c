@@ -482,6 +482,12 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	size_t rdbytes;
 	int retval = 0;
 	uint32_t size;
+	long offset;
+	double elapsed;
+	double speed;
+	double percentage;
+	double eta;
+	struct timeval tic, toc;
 
 	print_icdi_version(handle);
 
@@ -508,12 +514,14 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_WRITE(FMA, 0x0);
 	MEM_READ(DHCSR, &val);
 
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
 	if (erase_used) {
-		fseek(f, 0, SEEK_END);
-		size = ftell(f);
-		for (addr = start_addr; addr < (start_addr + size); addr += FLASH_ERASE_SIZE)
+		for (addr = start_addr; addr < (start_addr + size); addr += FLASH_ERASE_SIZE) {
 			FLASH_ERASE(addr, FLASH_ERASE_SIZE);
-		fseek(f, 0, SEEK_SET);
+		}
 	} else {
 		FLASH_ERASE(0, 0);
 	}
@@ -527,6 +535,8 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 	MEM_WRITE(ROMCTL, 0x0);
 	MEM_READ(DHCSR, &val);
 
+	gettimeofday(&tic, NULL);
+
 	for (addr = start_addr; !feof(f); addr += sizeof(flash_block)) {
 		rdbytes = fread(flash_block, 1, sizeof(flash_block), f);
 
@@ -535,12 +545,24 @@ static int write_firmware(libusb_device_handle *handle, FILE *f)
 			return LIBUSB_ERROR_OTHER;
 		}
 
+		offset = ftell(f);
+		percentage = (double)offset / size;
 		/*
 		 * Avoid writing a buffer with zero-sized content which can
 		 * happen when the input file has a size multiple of flash_block
 		 */
-		if (rdbytes)
+		if (rdbytes) {
+			printf("\rwriting: 0x%x, speed: %.2fKB/s, progress: %.2f%%, ETA: %.2fs ",
+					addr, (float)speed, (float)(percentage*100.f), (float)eta);
+			fflush(stdout);
 			FLASH_WRITE(addr, flash_block, rdbytes);
+		}
+
+		gettimeofday(&toc, NULL);
+		elapsed = (toc.tv_sec - tic.tv_sec) * 1000.0; // sec to ms
+		elapsed += (toc.tv_usec - tic.tv_usec) / 1000.0; // us to ms
+		eta = elapsed * (1/percentage - 1) / 1000.f;
+		speed = offset / elapsed * 1000.f / 1024;
 	}
 
 	if (do_verify) {
@@ -594,14 +616,10 @@ flasher_find_matching_device(
 	const char *serial)
 {
 	struct libusb_device_descriptor device_descriptor;
-#ifndef __APPLE__
 	char descriptor_buffer[256];
-#endif
 	libusb_device **device_list = NULL;
 	libusb_device *matching_device = NULL;
-#ifndef __APPLE__
 	libusb_device_handle *handle;
-#endif
 	enum flasher_error flasher_error;
 	enum libusb_error libusb_error;
 
@@ -643,7 +661,6 @@ flasher_find_matching_device(
 			continue;
 		}
 
-#ifndef __APPLE__
 		/* Open each device so that we can read the serial number */
 		retval = libusb_open(device_list[device_index], &handle);
 		if (retval < 0) {
@@ -666,7 +683,6 @@ flasher_find_matching_device(
 		/* Skip devices with serial that does not match */
 		if (serial != NULL && strcmp(serial, descriptor_buffer) != 0)
 			continue;
-#endif
 		if (matching_device == NULL) {
 			flasher_error = FLASHER_SUCCESS;
 			matching_device = device_list[device_index];
@@ -829,6 +845,9 @@ int main(int argc, char *argv[])
 	if (start_addr && (start_addr % FLASH_ERASE_SIZE)) {
 		printf("Address given to -S must be 0x%x aligned\n", FLASH_ERASE_SIZE);
 		return EXIT_FAILURE;
+	} else {
+		printf("flash start address 0x%X (%dK)\n",
+			   start_addr, start_addr / FLASH_ERASE_SIZE);
 	}
 
 	return flasher_flash(serial, rom_name);
